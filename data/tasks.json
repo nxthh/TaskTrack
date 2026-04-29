@@ -1,0 +1,26 @@
+[
+  {
+    "id": 2,
+    "title": "networking cisco",
+    "description": "aljflkdajfak",
+    "category": "networking",
+    "priority": "high",
+    "status": "to-do",
+    "dueDate": "01-05-2026",
+    "createdDate": "2026-04-29",
+    "assignee": "nxth",
+    "deleted": false
+  },
+  {
+    "id": 1,
+    "title": "english homework002",
+    "description": "finish essay",
+    "category": "english",
+    "priority": "medium",
+    "status": "finnished",
+    "dueDate": "30-04-2026",
+    "createdDate": "2026-04-29",
+    "assignee": "nxth",
+    "deleted": false
+  }
+]

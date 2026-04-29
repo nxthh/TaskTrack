@@ -1,0 +1,124 @@
+#pragma once
+#include <iostream>
+#include <ctime>
+#include <string>
+
+using namespace std;
+
+inline string todayDate() {
+  time_t t = time(0);
+  tm *now = localtime(&t);
+  char buf[11];
+  strftime(buf, sizeof(buf), "%Y-%m-%d", now);
+  return string(buf);
+}
+
+class Task {
+private:
+  int id;
+  string title;
+  string description;
+  string category;
+  string priority; // High / Medium / Low
+  string status;   // To-Do / In-Progress / Done
+  string dueDate;
+  string createdDate;
+  string assignee; // username owner
+  bool deleted = false;
+
+public:
+  Task() : id(0) {}
+
+  // ── getters ──────────────────────────────────────────────
+  int getId() const { return id; }
+  string getTitle() const { return title; }
+  string getDescription() const { return description; }
+  string getCategory() const { return category; }
+  string getPriority() const { return priority; }
+  string getStatus() const { return status; }
+  string getDueDate() const { return dueDate; }
+  string getCreatedDate() const { return createdDate; }
+  string getAssignee() const { return assignee; }
+  bool isDeleted() const { return deleted; }
+
+  // ── setters ──────────────────────────────────────────────
+  void setId(int i) { id = i; }
+  void setTitle(const string &v) { title = v; }
+  void setDescription(const string &v) { description = v; }
+  void setCategory(const string &v) { category = v; }
+  void setPriority(const string &v) { priority = v; }
+  void setStatus(const string &v) { status = v; }
+  void setDueDate(const string &v) { dueDate = v; }
+  void setCreatedDate(const string &v) { createdDate = v; }
+  void setAssignee(const string &v) { assignee = v; }
+  void setDeleted(bool v) { deleted = v; }
+
+  // ── helpers ──────────────────────────────────────────────
+  bool isOverdue() const {
+    return (status != "Done" && !dueDate.empty() && dueDate < todayDate());
+  }
+  bool isDueToday() const {
+    return (status != "Done" && dueDate == todayDate());
+  }
+  bool isUpcoming() const {
+    return (status != "Done" && dueDate > todayDate());
+  }
+
+  // Fill from user input (used when adding)
+  void input(const string &ownerUsername, int autoId) {
+    id = autoId;
+    assignee = ownerUsername;
+    createdDate = todayDate();
+
+    cout << "\n--- Add New Task ---\n";
+    cout << "Title: ";
+    cin.ignore();
+    getline(cin, title);
+
+    cout << "Description: ";
+    getline(cin, description);
+
+    cout << "Category (Backend/Frontend/Design/Other): ";
+    getline(cin, category);
+
+    cout << "Priority (High/Medium/Low): ";
+    cin >> priority;
+
+    cout << "Status (To-Do/In-Progress/Done): ";
+    cin >> status;
+
+    cout << "Due Date (YYYY-MM-DD): ";
+    cin >> dueDate;
+  }
+
+  // Edit fields interactively (press Enter to keep current value)
+  void edit() {
+    string input;
+    cout << "\n--- Edit Task (press Enter to keep current value) ---\n";
+
+    auto ask = [&](const string &label, string &field) {
+      cout << label << " (" << field << "): ";
+      getline(cin, input);
+      if (!input.empty())
+        field = input;
+    };
+
+    cin.ignore();
+    ask("Title", title);
+    ask("Description", description);
+    ask("Category", category);
+    ask("Priority", priority);
+    ask("Status", status);
+    ask("Due Date", dueDate);
+  }
+
+  // Advance status along the pipeline
+  void advanceStatus() {
+    if (status == "To-Do")
+      status = "In-Progress";
+    else if (status == "In-Progress")
+      status = "Done";
+    else
+      cout << "  Task is already Done.\n";
+  }
+};
