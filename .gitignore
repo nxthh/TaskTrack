@@ -1,0 +1,41 @@
+# =========================
+# CMake build directories
+# =========================
+build/
+cmake-build-*/
+out/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+
+# =========================
+# CMake files
+# =========================
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Makefile
+
+# =========================
+# Dependency folders (optional but common)
+# =========================
+_deps/
+extern/
+external/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.user
+*.suo
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
