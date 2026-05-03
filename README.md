@@ -50,7 +50,7 @@ Provides a quick overview of productivity metrics:
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/TaskTrack.git
+    git clone https://github.com/nxthh/TaskTrack.git
     ```
 2.  **Compile the source code:**
     ```bash
