@@ -2,6 +2,9 @@
 #include <vector>
 #include "Task.h"
 
+using std::string; 
+using std::vector; 
+
 class TaskManager {
 private:
     vector<Task> tasks;

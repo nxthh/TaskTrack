@@ -2,7 +2,8 @@
 #include <vector>
 #include <optional>
 #include "User.h"
-
+using std::string; 
+using std::vector;
 class AuthManager {
 private:
     vector<User>  users;

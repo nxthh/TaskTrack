@@ -3,14 +3,27 @@
 #include <ctime>
 #include <string>
 
-using namespace std;
+//using namespace std;
+using std::string; 
+using std::cout; 
+using std::cin; 
 
-inline string todayDate() {
-  time_t t = time(0);
-  tm *now = localtime(&t);
-  char buf[11];
-  strftime(buf, sizeof(buf), "%Y-%m-%d", now);
-  return string(buf);
+
+// inline string todayDate() {
+//   time_t t = time(0);
+//   tm *now = localtime(&t);
+//   char buf[11];
+//   strftime(buf, sizeof(buf), "%Y-%m-%d", now);
+//   return string(buf);
+// }
+inline std::string todayDate() {
+    time_t t = time(0);
+    tm now;                      // not a pointer anymore
+    localtime_s(&now, &t);       // safer version
+
+    char buf[11];
+    strftime(buf, sizeof(buf), "%Y-%m-%d", &now);
+    return std::string(buf);
 }
 
 class Task {

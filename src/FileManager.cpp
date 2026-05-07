@@ -7,8 +7,15 @@
 #include <sstream>
 #include <iostream>
 #include <filesystem>
+#include<string>
+ 
 namespace fs = std::filesystem;
-
+using std::ifstream; 
+using std::string; 
+using std::cerr; 
+using std::ofstream; 
+using std::ostringstream; 
+using std::to_string; 
 // ── low-level helpers ────────────────────────────────────────────────────────
 
 string FileManager::readFile(const string& path) {

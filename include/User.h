@@ -1,6 +1,9 @@
 #pragma once
 #include <string>
-using namespace std;
+//using namespace std;
+using std::string; 
+// using std::cin; 
+// using std::cout;
 
 enum class Role { User, Admin };
 

@@ -4,6 +4,9 @@
 #include "Task.h"
 #include "User.h"
 
+using std::vector;
+using std::string; 
+
 class FileManager {
 public:
     // ── Tasks ─────────────────────────────────────────────────
