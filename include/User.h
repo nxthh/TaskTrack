@@ -1,16 +1,14 @@
 #pragma once
 #include <string>
-//using namespace std;
-using std::string; 
-// using std::cin; 
-// using std::cout;
+
+using std::string;
 
 enum class Role { User, Admin };
 
 class User {
 private:
     string username;
-    string password;    // stored as-is; swap with a hash function if desired
+    string password;
     string fullName;
     string gender;
     Role   role;

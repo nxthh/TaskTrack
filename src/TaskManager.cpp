@@ -18,32 +18,47 @@ void TaskManager::recomputeNextId() {
 }
 
 static string priorityBadge(const string& p) {
-    if (p == "High")   return "[H] " + p;
-    if (p == "Medium") return "[M] " + p;
-    return "[L] " + p;
+    if (p == "High")   return "[H] High";
+    if (p == "Medium") return "[M] Medium";
+    return "[L] Low";
 }
 
 void TaskManager::printTable(const vector<Task>& list) const {
-    if (list.empty()) { cout << "  No tasks to show.\n"; return; }
+    if (list.empty()) {
+        cout << "\n  (no tasks to display)\n";
+        return;
+    }
 
     Table t;
-    t.add_row({"ID","Title","Status","Priority","Due Date","Category","Owner","Created"});
-    t[0].format().font_style({FontStyle::bold});
+    t.add_row({"ID", "Title", "Priority", "Status", "Due Date", "Owner", "Created"});
+    t[0].format()
+        .font_style({FontStyle::bold})
+        .font_color(Color::cyan);
 
     for (auto& task : list) {
         string due = task.getDueDate();
-        if (task.isOverdue()) due += " !!";
+        if (task.isOverdue()) due += " [OVERDUE]";
+
+        // Colour-code status
+        Color rowColour = Color::white;
+        if (task.getStatus() == "Done")        rowColour = Color::green;
+        else if (task.isOverdue())             rowColour = Color::red;
+        else if (task.getStatus() == "In-Progress") rowColour = Color::yellow;
+
         t.add_row({
             to_string(task.getId()),
             task.getTitle(),
-            task.getStatus(),
             priorityBadge(task.getPriority()),
+            task.getStatus(),
             due,
-            task.getCategory(),
             task.getAssignee(),
             task.getCreatedDate()
         });
+
+        size_t row = t.size() - 1;
+        t[row].format().font_color(rowColour);
     }
+
     cout << "\n" << t << "\n";
 }
 
@@ -112,11 +127,12 @@ void TaskManager::deleteTask(int id, const string& owner, bool isAdmin) {
     tasks.erase(it);
     saveToFile();
     saveTrash();
-    cout << "  Task moved to trash (use 'Restore' to recover).\n";
+    cout << "  Task moved to Recovery.\n";
 }
 
 void TaskManager::showAll(const string& owner, bool isAdmin) const {
     auto list = filterOwner(tasks, owner, isAdmin);
+    cout << "\n=== All Tasks ===";
     printTable(list);
 }
 
@@ -130,7 +146,8 @@ void TaskManager::advanceStatus(int id, const string& owner, bool isAdmin) {
             }
             string before = t.getStatus();
             t.advanceStatus();
-            cout << "  Status: " << before << " → " << t.getStatus() << "\n";
+            if (t.getStatus() != before)
+                cout << "  Status: " << before << " -> " << t.getStatus() << "\n";
             saveToFile();
             return;
         }
@@ -138,183 +155,81 @@ void TaskManager::advanceStatus(int id, const string& owner, bool isAdmin) {
     cout << "  Task not found.\n";
 }
 
-// ── Smart views ───────────────────────────────────────────────────────────────
+// ── Dashboard counts ──────────────────────────────────────────────────────────
 
-void TaskManager::showToday(const string& owner, bool isAdmin) const {
-    vector<Task> out;
-    for (auto& t : filterOwner(tasks, owner, isAdmin))
-        if (t.isDueToday()) out.push_back(t);
-    cout << "\n=== Today's Tasks ===\n";
-    printTable(out);
+int TaskManager::totalTasks() const {
+    return (int)tasks.size();
 }
 
-void TaskManager::showUpcoming(const string& owner, bool isAdmin) const {
-    vector<Task> out;
-    for (auto& t : filterOwner(tasks, owner, isAdmin))
-        if (t.isUpcoming()) out.push_back(t);
-    cout << "\n=== Upcoming Tasks ===\n";
-    printTable(out);
+int TaskManager::completedTasks(const string& owner, bool isAdmin) const {
+    auto list = filterOwner(tasks, owner, isAdmin);
+    int cnt = 0;
+    for (auto& t : list)
+        if (t.getStatus() == "Done") cnt++;
+    return cnt;
 }
 
-void TaskManager::showOverdue(const string& owner, bool isAdmin) const {
-    vector<Task> out;
-    for (auto& t : filterOwner(tasks, owner, isAdmin))
-        if (t.isOverdue()) out.push_back(t);
-    cout << "\n=== Overdue Tasks ===\n";
-    printTable(out);
-}
-
-// ── Search & Filter ───────────────────────────────────────────────────────────
-
-void TaskManager::search(const string& owner, bool isAdmin) const {
-    string kw;
-    cout << "Search keyword: ";
-    cin.ignore();
-    getline(cin, kw);
-
-    auto base = filterOwner(tasks, owner, isAdmin);
-    vector<Task> out;
-    for (auto& t : base) {
-        if (t.getTitle().find(kw)       != string::npos ||
-            t.getDescription().find(kw) != string::npos ||
-            t.getCategory().find(kw)    != string::npos)
-            out.push_back(t);
-    }
-    printTable(out);
-}
-
-void TaskManager::filterByStatus(const string& owner, bool isAdmin) const {
-    string val;
-    cout << "Status (To-Do / In-Progress / Done): ";
-    cin.ignore(); getline(cin, val);
-
-    auto base = filterOwner(tasks, owner, isAdmin);
-    vector<Task> out;
-    for (auto& t : base)
-        if (t.getStatus() == val) out.push_back(t);
-    printTable(out);
-}
-
-void TaskManager::filterByPriority(const string& owner, bool isAdmin) const {
-    string val;
-    cout << "Priority (High / Medium / Low): ";
-    cin.ignore(); getline(cin, val);
-
-    auto base = filterOwner(tasks, owner, isAdmin);
-    vector<Task> out;
-    for (auto& t : base)
-        if (t.getPriority() == val) out.push_back(t);
-    printTable(out);
-}
-
-void TaskManager::filterByDate(const string& owner, bool isAdmin) const {
-    cout << "Date filter:\n";
-    cout << "  1. Today\n  2. Upcoming\n  3. Overdue\n";
-    cout << "Choice: ";
-    int ch; cin >> ch;
-    if (ch == 1) showToday(owner, isAdmin);
-    else if (ch == 2) showUpcoming(owner, isAdmin);
-    else if (ch == 3) showOverdue(owner, isAdmin);
-    else cout << "  Invalid choice.\n";
-}
-
-// ── Sort ─────────────────────────────────────────────────────────────────────
-
-void TaskManager::sortTasks(const string& owner, bool isAdmin) {
-    cout << "Sort by (id / due / priority / status): ";
-    string type; cin >> type;
-
-    auto cmpPriority = [](const Task& a, const Task& b) {
-        // High > Medium > Low
-        auto rank = [](const string& p) {
-            if (p == "High")   return 0;
-            if (p == "Medium") return 1;
-            return 2;
-        };
-        return rank(a.getPriority()) < rank(b.getPriority());
-    };
-
-    if      (type == "id")       sort(tasks.begin(), tasks.end(),
-        [](Task& a, Task& b){ return a.getId() < b.getId(); });
-    else if (type == "due")      sort(tasks.begin(), tasks.end(),
-        [](Task& a, Task& b){ return a.getDueDate() < b.getDueDate(); });
-    else if (type == "priority") sort(tasks.begin(), tasks.end(), cmpPriority);
-    else if (type == "status")   sort(tasks.begin(), tasks.end(),
-        [](Task& a, Task& b){ return a.getStatus() < b.getStatus(); });
-    else { cout << "  Unknown sort key.\n"; return; }
-
-    saveToFile();
-    cout << "  Tasks sorted by " << type << ".\n";
+int TaskManager::pendingTasks(const string& owner, bool isAdmin) const {
+    auto list = filterOwner(tasks, owner, isAdmin);
+    int cnt = 0;
+    for (auto& t : list)
+        if (t.getStatus() != "Done") cnt++;
+    return cnt;
 }
 
 // ── Trash / Recovery ──────────────────────────────────────────────────────────
 
 void TaskManager::showTrash() const {
-    cout << "\n=== Trash (soft-deleted tasks) ===\n";
+    cout << "\n=== Recovery (Trash) ===";
     printTable(trash);
 }
 
 void TaskManager::restoreTask(int id) {
     auto it = find_if(trash.begin(), trash.end(),
         [&](Task& t){ return t.getId() == id; });
-    if (it == trash.end()) { cout << "  Task not in trash.\n"; return; }
+    if (it == trash.end()) { cout << "  Task not found in Recovery.\n"; return; }
     it->setDeleted(false);
     tasks.push_back(*it);
     trash.erase(it);
     saveToFile();
     saveTrash();
-    cout << "  Task restored.\n";
+    cout << "  Task restored successfully.\n";
+}
+
+void TaskManager::permanentDelete(int id) {
+    auto it = find_if(trash.begin(), trash.end(),
+        [&](Task& t){ return t.getId() == id; });
+    if (it == trash.end()) { cout << "  Task not found in Recovery.\n"; return; }
+    cout << "  Permanently delete task \"" << it->getTitle() << "\"? (y/n): ";
+    char c; cin >> c;
+    if (c == 'y' || c == 'Y') {
+        trash.erase(it);
+        saveTrash();
+        cout << "  Task permanently deleted.\n";
+    }
 }
 
 void TaskManager::emptyTrash() {
-    cout << "  Empty trash? This is permanent. (y/n): ";
+    if (trash.empty()) { cout << "  Recovery is already empty.\n"; return; }
+    cout << "  Permanently delete ALL " << trash.size() << " items in Recovery? (y/n): ";
     char c; cin >> c;
     if (c == 'y' || c == 'Y') {
         trash.clear();
         saveTrash();
-        cout << "  Trash emptied.\n";
+        cout << "  Recovery emptied.\n";
     }
 }
 
 // ── Admin clear ───────────────────────────────────────────────────────────────
 
 void TaskManager::clearAllTasks() {
-    cout << "  Clear ALL tasks? (y/n): ";
+    cout << "  Clear ALL tasks and Recovery? (y/n): ";
     char c; cin >> c;
     if (c == 'y' || c == 'Y') {
         tasks.clear();
         trash.clear();
         nextId = 1;
         FileManager::clearAllTasks();
-        cout << "  All tasks and trash cleared.\n";
+        cout << "  All tasks and Recovery cleared.\n";
     }
-}
-
-// ── Statistics ────────────────────────────────────────────────────────────────
-
-void TaskManager::statistics(const string& owner, bool isAdmin) const {
-    auto list = filterOwner(tasks, owner, isAdmin);
-    int total = (int)list.size();
-    int todo = 0, prog = 0, done = 0, overdue = 0;
-
-    for (auto& t : list) {
-        if (t.getStatus() == "To-Do")       todo++;
-        else if (t.getStatus() == "In-Progress") prog++;
-        else if (t.getStatus() == "Done")   done++;
-        if (t.isOverdue())                  overdue++;
-    }
-
-    int width = 30;
-    int filled = total ? (done * width / total) : 0;
-
-    cout << "\n========== STATISTICS ==========\n";
-    cout << "Total Tasks   : " << total   << "\n";
-    cout << "To-Do         : " << todo    << "\n";
-    cout << "In-Progress   : " << prog    << "\n";
-    cout << "Done          : " << done    << "\n";
-    cout << "Overdue       : " << overdue << "\n";
-    cout << "Progress: [";
-    for (int i = 0; i < width; i++) cout << (i < filled ? "#" : "-");
-    cout << "] " << (total ? (done * 100 / total) : 0) << "% complete\n";
-    cout << "================================\n";
 }

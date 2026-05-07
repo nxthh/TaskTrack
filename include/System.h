@@ -7,13 +7,21 @@ private:
     AuthManager auth;
     TaskManager tasks;
 
+    // ── UI helpers ────────────────────────────────────────────
+    static void clearScreen();
+    static void pauseScreen();
+
+    // ── Menus ─────────────────────────────────────────────────
     void showAuthMenu();
     void showUserMenu();
     void showAdminMenu();
 
-    void handleUserTaskMenu();
+    // ── Sub-menus ─────────────────────────────────────────────
+    void handleTaskMenu();
+    void handleDashboard();
     void handleAdminUserMenu();
     void handleAdminDataMenu();
+    void handleRecoveryMenu();
 
 public:
     void run();

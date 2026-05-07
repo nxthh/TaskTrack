@@ -1,21 +1,22 @@
 /*  FileManager.cpp
     Hand-rolled JSON encode/decode — no external JSON library needed.
-    Format mirrors the existing tasks.json structure and is human-readable.
 */
 #include "FileManager.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <filesystem>
-#include<string>
- 
+#include <string>
+
 namespace fs = std::filesystem;
-using std::ifstream; 
-using std::string; 
-using std::cerr; 
-using std::ofstream; 
-using std::ostringstream; 
-using std::to_string; 
+using std::ifstream;
+using std::string;
+using std::cerr;
+using std::cout;
+using std::ofstream;
+using std::ostringstream;
+using std::to_string;
+
 // ── low-level helpers ────────────────────────────────────────────────────────
 
 string FileManager::readFile(const string& path) {
@@ -45,25 +46,23 @@ void FileManager::ensureDataDir() {
     fs::create_directories("data/backup");
 }
 
-// ── JSON encode helpers (minimal, no escaping of rare chars) ─────────────────
+// ── JSON encode helpers ───────────────────────────────────────────────────────
 
 static string jstr(const string& v) {
-    // Escape backslash and double-quote
     string out;
     for (char c : v) {
-        if (c == '"')  out += "\\\"";
+        if      (c == '"')  out += "\\\"";
         else if (c == '\\') out += "\\\\";
         else out += c;
     }
     return "\"" + out + "\"";
 }
 
-static string jbool(bool b) { return b ? "true" : "false"; }
-static string jint(int i)   { return to_string(i); }
+static string jbool(bool b)  { return b ? "true" : "false"; }
+static string jint(int i)    { return to_string(i); }
 
 // ── JSON decode helpers ───────────────────────────────────────────────────────
 
-// Extract the raw value string for a key from a JSON object string (one level)
 static string jsonVal(const string& obj, const string& key) {
     string needle = "\"" + key + "\"";
     size_t pos = obj.find(needle);
@@ -74,28 +73,24 @@ static string jsonVal(const string& obj, const string& key) {
     while (pos < obj.size() && isspace(obj[pos])) pos++;
     if (pos >= obj.size()) return "";
     if (obj[pos] == '"') {
-        // string value
-        size_t start = pos + 1;
-        size_t end = start;
+        size_t start = pos + 1, end = start;
         while (end < obj.size()) {
             if (obj[end] == '\\') { end += 2; continue; }
             if (obj[end] == '"')  break;
             end++;
         }
         string raw = obj.substr(start, end - start);
-        // unescape
         string out;
         for (size_t i = 0; i < raw.size(); i++) {
             if (raw[i] == '\\' && i + 1 < raw.size()) {
                 char n = raw[++i];
-                if (n == '"')  out += '"';
+                if      (n == '"')  out += '"';
                 else if (n == '\\') out += '\\';
                 else out += n;
             } else out += raw[i];
         }
         return out;
     } else {
-        // number / bool
         size_t end = pos;
         while (end < obj.size() && obj[end] != ',' && obj[end] != '}' && obj[end] != ']')
             end++;
@@ -105,7 +100,6 @@ static string jsonVal(const string& obj, const string& key) {
     }
 }
 
-// Split a JSON array string into individual object strings
 static vector<string> jsonArray(const string& arr) {
     vector<string> items;
     int depth = 0;
@@ -132,7 +126,6 @@ static string encodeTask(const Task& t) {
         "    \"id\": "          + jint(t.getId())           + ",\n"
         "    \"title\": "       + jstr(t.getTitle())        + ",\n"
         "    \"description\": " + jstr(t.getDescription())  + ",\n"
-        "    \"category\": "    + jstr(t.getCategory())     + ",\n"
         "    \"priority\": "    + jstr(t.getPriority())     + ",\n"
         "    \"status\": "      + jstr(t.getStatus())       + ",\n"
         "    \"dueDate\": "     + jstr(t.getDueDate())      + ",\n"
@@ -144,10 +137,10 @@ static string encodeTask(const Task& t) {
 
 static Task decodeTask(const string& obj) {
     Task t;
-    t.setId(stoi(jsonVal(obj, "id").empty() ? "0" : jsonVal(obj, "id")));
+    string idStr = jsonVal(obj, "id");
+    t.setId(idStr.empty() ? 0 : stoi(idStr));
     t.setTitle(jsonVal(obj, "title"));
     t.setDescription(jsonVal(obj, "description"));
-    t.setCategory(jsonVal(obj, "category"));
     t.setPriority(jsonVal(obj, "priority"));
     t.setStatus(jsonVal(obj, "status"));
     t.setDueDate(jsonVal(obj, "dueDate"));
@@ -180,7 +173,7 @@ vector<Task> FileManager::loadTasks(const string& path) {
 // ── Trash ────────────────────────────────────────────────────────────────────
 
 void FileManager::saveTrash(const vector<Task>& trash, const string& path) {
-    saveTasks(trash, path);   // same format
+    saveTasks(trash, path);
 }
 
 vector<Task> FileManager::loadTrash(const string& path) {

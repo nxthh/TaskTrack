@@ -1,13 +1,14 @@
 #pragma once
 #include <vector>
-#include <optional>
 #include "User.h"
-using std::string; 
+
+using std::string;
 using std::vector;
+
 class AuthManager {
 private:
-    vector<User>  users;
-    User*         currentUser = nullptr;   // points into users vector
+    vector<User> users;
+    User*        currentUser = nullptr;   // points into users vector
 
     bool usernameExists(const string& u) const;
 
@@ -22,16 +23,16 @@ public:
     void logout();
 
     // ── Session ───────────────────────────────────────────────
-    bool isLoggedIn()  const { return currentUser != nullptr; }
+    bool  isLoggedIn() const { return currentUser != nullptr; }
     User* getUser()          { return currentUser; }
 
     // ── Admin features ────────────────────────────────────────
-    void viewAllUsers()             const;
+    void viewAllUsers()                    const;
     void deleteUser(const string& username);
     void resetPassword(const string& username);
     void searchUser(const string& keyword) const;
-    void clearAllUsers();           // keeps first admin account
+    void clearAllUsers();
 
     // ── Utilities ─────────────────────────────────────────────
-    int  userCount() const { return (int)users.size(); }
+    int userCount() const { return (int)users.size(); }
 };

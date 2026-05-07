@@ -15,18 +15,10 @@ bool AuthManager::usernameExists(const string& u) const {
     return false;
 }
 
-static string hiddenInput() {
-    // Simple hidden input — on POSIX you'd use termios; here just reads normally.
-    string pw;
-    cin >> pw;
-    return pw;
-}
-
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
 void AuthManager::loadFromFile() {
     users = FileManager::loadUsers();
-    // If no users exist, create a default admin
     if (users.empty()) {
         cout << "  No users found. Creating default admin account.\n";
         users.emplace_back("admin", "admin123", "Administrator", "N/A", Role::Admin);
@@ -41,7 +33,7 @@ void AuthManager::saveToFile() const {
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 bool AuthManager::signup() {
-    string username, password, fullName, gender, roleInput;
+    string username, password, fullName, gender;
     cout << "\n--- Sign Up ---\n";
     cout << "Username: ";
     cin >> username;
@@ -52,20 +44,17 @@ bool AuthManager::signup() {
     }
 
     cout << "Password: ";
-    password = hiddenInput();
+    cin >> password;
     cin.ignore();
 
     cout << "Full Name: ";
     getline(cin, fullName);
 
-    cout << "Gender (M/F/Other): ";
+    cout << "Gender (M / F / Other): ";
     cin >> gender;
 
-    cout << "Role (User/Admin): ";
-    cin >> roleInput;
-    Role role = (roleInput == "Admin") ? Role::Admin : Role::User;
-
-    users.emplace_back(username, password, fullName, gender, role);
+    // All sign-ups are regular Users — only the seeded admin account is Admin
+    users.emplace_back(username, password, fullName, gender, Role::User);
     saveToFile();
     cout << "  Account created! Please log in.\n";
     return true;
@@ -77,12 +66,13 @@ bool AuthManager::login() {
     cout << "Username: ";
     cin >> username;
     cout << "Password: ";
-    password = hiddenInput();
+    cin >> password;
 
     for (auto& u : users) {
         if (u.getUsername() == username && u.getPassword() == password) {
             currentUser = &u;
-            cout << "  Welcome, " << u.getFullName() << "! (" << u.getRoleStr() << ")\n";
+            cout << "  Welcome, " << u.getFullName()
+                 << "! (" << u.getRoleStr() << ")\n";
             return true;
         }
     }
@@ -100,8 +90,10 @@ void AuthManager::logout() {
 
 void AuthManager::viewAllUsers() const {
     Table t;
-    t.add_row({"Username","Full Name","Gender","Role"});
-    t[0].format().font_style({tabulate::FontStyle::bold});
+    t.add_row({"Username", "Full Name", "Gender", "Role"});
+    t[0].format()
+        .font_style({FontStyle::bold})
+        .font_color(Color::cyan);
 
     for (auto& u : users)
         t.add_row({u.getUsername(), u.getFullName(), u.getGender(), u.getRoleStr()});
@@ -141,13 +133,15 @@ void AuthManager::resetPassword(const string& username) {
 
 void AuthManager::searchUser(const string& keyword) const {
     Table t;
-    t.add_row({"Username","Full Name","Gender","Role"});
-    t[0].format().font_style({tabulate::FontStyle::bold});
+    t.add_row({"Username", "Full Name", "Gender", "Role"});
+    t[0].format()
+        .font_style({FontStyle::bold})
+        .font_color(Color::cyan);
 
     bool found = false;
     for (auto& u : users) {
         if (u.getUsername().find(keyword) != string::npos ||
-            u.getFullName().find(keyword) != string::npos) {
+            u.getFullName().find(keyword)  != string::npos) {
             t.add_row({u.getUsername(), u.getFullName(), u.getGender(), u.getRoleStr()});
             found = true;
         }
@@ -157,7 +151,6 @@ void AuthManager::searchUser(const string& keyword) const {
 }
 
 void AuthManager::clearAllUsers() {
-    // Keep the first admin account only
     vector<User> admins;
     for (auto& u : users)
         if (u.isAdmin()) { admins.push_back(u); break; }

@@ -2,8 +2,8 @@
 #include <vector>
 #include "Task.h"
 
-using std::string; 
-using std::vector; 
+using std::string;
+using std::vector;
 
 class TaskManager {
 private:
@@ -11,8 +11,8 @@ private:
     vector<Task> trash;
     int          nextId = 1;
 
-    void   recomputeNextId();
-    void   printTable(const vector<Task>& list) const;
+    void recomputeNextId();
+    void printTable(const vector<Task>& list) const;
 
 public:
     // ── Lifecycle ─────────────────────────────────────────────
@@ -30,28 +30,17 @@ public:
     // ── Status pipeline ───────────────────────────────────────
     void advanceStatus(int id, const string& ownerUsername, bool isAdmin);
 
-    // ── Smart views ───────────────────────────────────────────
-    void showToday(const string& ownerUsername, bool isAdmin)    const;
-    void showUpcoming(const string& ownerUsername, bool isAdmin) const;
-    void showOverdue(const string& ownerUsername, bool isAdmin)  const;
-
-    // ── Search & Filter ───────────────────────────────────────
-    void search(const string& ownerUsername, bool isAdmin)        const;
-    void filterByStatus(const string& ownerUsername, bool isAdmin) const;
-    void filterByPriority(const string& ownerUsername, bool isAdmin) const;
-    void filterByDate(const string& ownerUsername, bool isAdmin)   const;
-
-    // ── Sort ──────────────────────────────────────────────────
-    void sortTasks(const string& ownerUsername, bool isAdmin);
+    // ── Dashboard counts ──────────────────────────────────────
+    int totalTasks()     const;
+    int completedTasks(const string& ownerUsername, bool isAdmin) const;
+    int pendingTasks(const string& ownerUsername, bool isAdmin)   const;
 
     // ── Trash / Recovery ──────────────────────────────────────
-    void showTrash() const;
+    void showTrash()                const;
     void restoreTask(int id);
+    void permanentDelete(int id);
     void emptyTrash();
 
     // ── Admin clear ───────────────────────────────────────────
     void clearAllTasks();
-
-    // ── Statistics ────────────────────────────────────────────
-    void statistics(const string& ownerUsername, bool isAdmin) const;
 };
