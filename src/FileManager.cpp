@@ -1,5 +1,10 @@
 /*  FileManager.cpp
-    Hand-rolled JSON encode/decode — no external JSON library needed.
+    CSV encode/decode — files open natively in Excel.
+    Format: RFC-4180 compliant CSV with a header row.
+
+    tasks.csv  columns : id,title,description,priority,status,dueDate,createdDate,assignee,deleted
+    trash.csv  columns : same as tasks.csv
+    users.csv  columns : username,password,fullName,gender,role
 */
 #include "FileManager.h"
 #include <fstream>
@@ -10,18 +15,20 @@
 
 namespace fs = std::filesystem;
 using std::ifstream;
-using std::string;
-using std::cerr;
-using std::cout;
 using std::ofstream;
 using std::ostringstream;
+using std::istringstream;
+using std::string;
+using std::vector;
+using std::cerr;
+using std::cout;
 using std::to_string;
 
-// ── low-level helpers ────────────────────────────────────────────────────────
+// ── low-level file I/O ───────────────────────────────────────────────────────
 
 string FileManager::readFile(const string& path) {
     ifstream f(path);
-    if (!f.is_open()) return "[]";
+    if (!f.is_open()) return "";
     ostringstream ss;
     ss << f.rdbuf();
     return ss.str();
@@ -36,9 +43,19 @@ void FileManager::writeFile(const string& path, const string& content) {
     f << content;
 }
 
-void FileManager::copyFile(const string& src, const string& dst) {
-    try { fs::copy_file(src, dst, fs::copy_options::overwrite_existing); }
-    catch (...) { cerr << "  [FileManager] Copy failed: " << src << "\n"; }
+bool FileManager::copyFile(const string& src, const string& dst) {
+    try {
+        if (!fs::exists(src)) {
+            cerr << "  [FileManager] Source file not found: " << src << "\n";
+            return false;
+        }
+        fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
+        return true;
+    }
+    catch (const std::exception& e) {
+        cerr << "  [FileManager] Copy failed: " << src << " (" << e.what() << ")\n";
+        return false;
+    }
 }
 
 void FileManager::ensureDataDir() {
@@ -46,127 +63,116 @@ void FileManager::ensureDataDir() {
     fs::create_directories("data/backup");
 }
 
-// ── JSON encode helpers ───────────────────────────────────────────────────────
+// ── CSV helpers (free functions — internal to this translation unit) ──────────
+// RFC-4180: fields containing comma, double-quote, or newline are wrapped in
+// double-quotes; any embedded double-quote is escaped as "".
 
-static string jstr(const string& v) {
-    string out;
-    for (char c : v) {
-        if      (c == '"')  out += "\\\"";
-        else if (c == '\\') out += "\\\\";
-        else out += c;
+static string csvEscape(const string& field) {
+    bool needsQuote = (field.find(',')  != string::npos ||
+                       field.find('"')  != string::npos ||
+                       field.find('\n') != string::npos ||
+                       field.find('\r') != string::npos);
+    if (!needsQuote) return field;
+
+    string out = "\"";
+    for (char c : field) {
+        if (c == '"') out += "\"\"";
+        else          out += c;
     }
-    return "\"" + out + "\"";
+    out += '"';
+    return out;
 }
 
-static string jbool(bool b)  { return b ? "true" : "false"; }
-static string jint(int i)    { return to_string(i); }
+// Parse one CSV line into fields (handles quoted fields with embedded commas/quotes)
+static vector<string> csvParseLine(const string& line) {
+    vector<string> fields;
+    string field;
+    bool inQuotes = false;
 
-// ── JSON decode helpers ───────────────────────────────────────────────────────
-
-static string jsonVal(const string& obj, const string& key) {
-    string needle = "\"" + key + "\"";
-    size_t pos = obj.find(needle);
-    if (pos == string::npos) return "";
-    pos = obj.find(':', pos + needle.size());
-    if (pos == string::npos) return "";
-    pos++;
-    while (pos < obj.size() && isspace(obj[pos])) pos++;
-    if (pos >= obj.size()) return "";
-    if (obj[pos] == '"') {
-        size_t start = pos + 1, end = start;
-        while (end < obj.size()) {
-            if (obj[end] == '\\') { end += 2; continue; }
-            if (obj[end] == '"')  break;
-            end++;
-        }
-        string raw = obj.substr(start, end - start);
-        string out;
-        for (size_t i = 0; i < raw.size(); i++) {
-            if (raw[i] == '\\' && i + 1 < raw.size()) {
-                char n = raw[++i];
-                if      (n == '"')  out += '"';
-                else if (n == '\\') out += '\\';
-                else out += n;
-            } else out += raw[i];
-        }
-        return out;
-    } else {
-        size_t end = pos;
-        while (end < obj.size() && obj[end] != ',' && obj[end] != '}' && obj[end] != ']')
-            end++;
-        string val = obj.substr(pos, end - pos);
-        while (!val.empty() && isspace(val.back())) val.pop_back();
-        return val;
-    }
-}
-
-static vector<string> jsonArray(const string& arr) {
-    vector<string> items;
-    int depth = 0;
-    size_t start = string::npos;
-    for (size_t i = 0; i < arr.size(); i++) {
-        if (arr[i] == '{') {
-            if (depth == 0) start = i;
-            depth++;
-        } else if (arr[i] == '}') {
-            depth--;
-            if (depth == 0 && start != string::npos) {
-                items.push_back(arr.substr(start, i - start + 1));
-                start = string::npos;
+    for (size_t i = 0; i < line.size(); i++) {
+        char c = line[i];
+        if (inQuotes) {
+            if (c == '"') {
+                if (i + 1 < line.size() && line[i + 1] == '"') {
+                    field += '"';
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+            } else {
+                field += c;
             }
+        } else {
+            if      (c == '"')  { inQuotes = true; }
+            else if (c == ',')  { fields.push_back(field); field.clear(); }
+            else if (c == '\r') { /* skip CR */ }
+            else                { field += c; }
         }
     }
-    return items;
+    fields.push_back(field);  // last field
+    return fields;
+}
+
+// Split file content into non-empty lines
+static vector<string> splitLines(const string& text) {
+    vector<string> lines;
+    istringstream ss(text);
+    string line;
+    while (getline(ss, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (!line.empty()) lines.push_back(line);
+    }
+    return lines;
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────────
 
+static const string TASK_HEADER =
+    "id,title,description,priority,status,dueDate,createdDate,assignee,deleted";
+
 static string encodeTask(const Task& t) {
-    return "  {\n"
-        "    \"id\": "          + jint(t.getId())           + ",\n"
-        "    \"title\": "       + jstr(t.getTitle())        + ",\n"
-        "    \"description\": " + jstr(t.getDescription())  + ",\n"
-        "    \"priority\": "    + jstr(t.getPriority())     + ",\n"
-        "    \"status\": "      + jstr(t.getStatus())       + ",\n"
-        "    \"dueDate\": "     + jstr(t.getDueDate())      + ",\n"
-        "    \"createdDate\": " + jstr(t.getCreatedDate())  + ",\n"
-        "    \"assignee\": "    + jstr(t.getAssignee())     + ",\n"
-        "    \"deleted\": "     + jbool(t.isDeleted())      + "\n"
-        "  }";
+    return
+        csvEscape(to_string(t.getId()))          + "," +
+        csvEscape(t.getTitle())                  + "," +
+        csvEscape(t.getDescription())            + "," +
+        csvEscape(t.getPriority())               + "," +
+        csvEscape(t.getStatus())                 + "," +
+        csvEscape(t.getDueDate())                + "," +
+        csvEscape(t.getCreatedDate())            + "," +
+        csvEscape(t.getAssignee())               + "," +
+        csvEscape(t.isDeleted() ? "true" : "false");
 }
 
-static Task decodeTask(const string& obj) {
+static Task decodeTask(const vector<string>& f) {
+    if (f.size() < 9) return Task{};
     Task t;
-    string idStr = jsonVal(obj, "id");
-    t.setId(idStr.empty() ? 0 : stoi(idStr));
-    t.setTitle(jsonVal(obj, "title"));
-    t.setDescription(jsonVal(obj, "description"));
-    t.setPriority(jsonVal(obj, "priority"));
-    t.setStatus(jsonVal(obj, "status"));
-    t.setDueDate(jsonVal(obj, "dueDate"));
-    t.setCreatedDate(jsonVal(obj, "createdDate"));
-    t.setAssignee(jsonVal(obj, "assignee"));
-    t.setDeleted(jsonVal(obj, "deleted") == "true");
+    t.setId(f[0].empty() ? 0 : stoi(f[0]));
+    t.setTitle(f[1]);
+    t.setDescription(f[2]);
+    t.setPriority(f[3]);
+    t.setStatus(f[4]);
+    t.setDueDate(f[5]);
+    t.setCreatedDate(f[6]);
+    t.setAssignee(f[7]);
+    t.setDeleted(f[8] == "true");
     return t;
 }
 
 void FileManager::saveTasks(const vector<Task>& tasks, const string& path) {
     ensureDataDir();
-    string out = "[\n";
-    for (size_t i = 0; i < tasks.size(); i++) {
-        out += encodeTask(tasks[i]);
-        if (i + 1 < tasks.size()) out += ",";
-        out += "\n";
-    }
-    out += "]\n";
+    string out = TASK_HEADER + "\n";
+    for (auto& t : tasks)
+        out += encodeTask(t) + "\n";
     writeFile(path, out);
 }
 
 vector<Task> FileManager::loadTasks(const string& path) {
     vector<Task> result;
     string raw = readFile(path);
-    for (auto& obj : jsonArray(raw))
-        result.push_back(decodeTask(obj));
+    if (raw.empty()) return result;
+    auto lines = splitLines(raw);
+    for (size_t i = 1; i < lines.size(); i++)   // skip header row
+        result.push_back(decodeTask(csvParseLine(lines[i])));
     return result;
 }
 
@@ -182,45 +188,38 @@ vector<Task> FileManager::loadTrash(const string& path) {
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
+static const string USER_HEADER = "username,password,fullName,gender,role";
+
 static string encodeUser(const User& u) {
-    return "  {\n"
-        "    \"username\": " + jstr(u.getUsername()) + ",\n"
-        "    \"password\": " + jstr(u.getPassword()) + ",\n"
-        "    \"fullName\": " + jstr(u.getFullName()) + ",\n"
-        "    \"gender\": "   + jstr(u.getGender())   + ",\n"
-        "    \"role\": "     + jstr(u.getRoleStr())  + "\n"
-        "  }";
+    return
+        csvEscape(u.getUsername()) + "," +
+        csvEscape(u.getPassword()) + "," +
+        csvEscape(u.getFullName()) + "," +
+        csvEscape(u.getGender())   + "," +
+        csvEscape(u.getRoleStr());
 }
 
-static User decodeUser(const string& obj) {
-    string roleStr = jsonVal(obj, "role");
-    Role r = (roleStr == "Admin") ? Role::Admin : Role::User;
-    return User(
-        jsonVal(obj, "username"),
-        jsonVal(obj, "password"),
-        jsonVal(obj, "fullName"),
-        jsonVal(obj, "gender"),
-        r
-    );
+static User decodeUser(const vector<string>& f) {
+    if (f.size() < 5) return User{};
+    Role r = (f[4] == "Admin") ? Role::Admin : Role::User;
+    return User(f[0], f[1], f[2], f[3], r);
 }
 
 void FileManager::saveUsers(const vector<User>& users, const string& path) {
     ensureDataDir();
-    string out = "[\n";
-    for (size_t i = 0; i < users.size(); i++) {
-        out += encodeUser(users[i]);
-        if (i + 1 < users.size()) out += ",";
-        out += "\n";
-    }
-    out += "]\n";
+    string out = USER_HEADER + "\n";
+    for (auto& u : users)
+        out += encodeUser(u) + "\n";
     writeFile(path, out);
 }
 
 vector<User> FileManager::loadUsers(const string& path) {
     vector<User> result;
     string raw = readFile(path);
-    for (auto& obj : jsonArray(raw))
-        result.push_back(decodeUser(obj));
+    if (raw.empty()) return result;
+    auto lines = splitLines(raw);
+    for (size_t i = 1; i < lines.size(); i++)   // skip header row
+        result.push_back(decodeUser(csvParseLine(lines[i])));
     return result;
 }
 
@@ -228,26 +227,38 @@ vector<User> FileManager::loadUsers(const string& path) {
 
 void FileManager::backup() {
     ensureDataDir();
-    copyFile("data/tasks.json", "data/backup/tasks.json");
-    copyFile("data/trash.json", "data/backup/trash.json");
-    copyFile("data/users.json", "data/backup/users.json");
-    cout << "  Backup saved to data/backup/\n";
+    bool all_ok = true;
+    all_ok &= copyFile("data/tasks.csv", "data/backup/tasks.csv");
+    all_ok &= copyFile("data/trash.csv", "data/backup/trash.csv");
+    all_ok &= copyFile("data/users.csv", "data/backup/users.csv");
+    
+    if (all_ok) {
+        cout << "  Backup saved to data/backup/\n";
+    } else {
+        cout << "  Backup completed with errors (see above)\n";
+    }
 }
 
 void FileManager::restore() {
-    copyFile("data/backup/tasks.json", "data/tasks.json");
-    copyFile("data/backup/trash.json", "data/trash.json");
-    copyFile("data/backup/users.json", "data/users.json");
-    cout << "  Data restored from data/backup/\n";
+    bool all_ok = true;
+    all_ok &= copyFile("data/backup/tasks.csv", "data/tasks.csv");
+    all_ok &= copyFile("data/backup/trash.csv", "data/trash.csv");
+    all_ok &= copyFile("data/backup/users.csv", "data/users.csv");
+    
+    if (all_ok) {
+        cout << "  Data restored from data/backup/\n";
+    } else {
+        cout << "  Restore completed with errors (see above)\n";
+    }
 }
 
 void FileManager::clearAllTasks() {
-    writeFile("data/tasks.json", "[]\n");
-    writeFile("data/trash.json", "[]\n");
+    writeFile("data/tasks.csv", TASK_HEADER + "\n");
+    writeFile("data/trash.csv", TASK_HEADER + "\n");
     cout << "  All task data cleared.\n";
 }
 
 void FileManager::clearAllUsers() {
-    writeFile("data/users.json", "[]\n");
+    writeFile("data/users.csv", USER_HEADER + "\n");
     cout << "  All user data cleared.\n";
 }

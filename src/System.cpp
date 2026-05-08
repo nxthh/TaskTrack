@@ -1,5 +1,6 @@
 #include "System.h"
 #include "FileManager.h"
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -479,6 +480,22 @@ void System::showAdminMenu() {
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 void System::run() {
+
+    try {
+        
+        std::filesystem::path exe_dir = std::filesystem::current_path();
+        
+        std::filesystem::path project_root = exe_dir.parent_path().parent_path();
+        
+        std::filesystem::current_path(project_root);
+        
+        std::cout << "  Working directory set to: " << std::filesystem::current_path().string() << "\n";
+    } 
+    catch (const std::exception& e) {
+        std::cerr << "  Warning: Could not change directory: " << e.what() << "\n";
+        std::cerr << "  Continuing with current directory...\n";
+    }
+    
     FileManager::ensureDataDir();
 
     auth.loadFromFile();

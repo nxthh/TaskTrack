@@ -1,0 +1,3 @@
+username,password,fullName,gender,role
+admin,admin123,Administrator,N/A,Admin
+john,john123,John Doe,M,User
