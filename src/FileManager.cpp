@@ -227,29 +227,17 @@ vector<User> FileManager::loadUsers(const string& path) {
 
 void FileManager::backup() {
     ensureDataDir();
-    bool all_ok = true;
-    all_ok &= copyFile("data/tasks.csv", "data/backup/tasks.csv");
-    all_ok &= copyFile("data/trash.csv", "data/backup/trash.csv");
-    all_ok &= copyFile("data/users.csv", "data/backup/users.csv");
-    
-    if (all_ok) {
-        cout << "  Backup saved to data/backup/\n";
-    } else {
-        cout << "  Backup completed with errors (see above)\n";
-    }
+    copyFile("data/tasks.csv", "data/backup/tasks.csv");
+    copyFile("data/trash.csv", "data/backup/trash.csv");
+    copyFile("data/users.csv", "data/backup/users.csv");
+    cout << "  Backup saved to data/backup/\n";
 }
 
 void FileManager::restore() {
-    bool all_ok = true;
-    all_ok &= copyFile("data/backup/tasks.csv", "data/tasks.csv");
-    all_ok &= copyFile("data/backup/trash.csv", "data/trash.csv");
-    all_ok &= copyFile("data/backup/users.csv", "data/users.csv");
-    
-    if (all_ok) {
-        cout << "  Data restored from data/backup/\n";
-    } else {
-        cout << "  Restore completed with errors (see above)\n";
-    }
+    copyFile("data/backup/tasks.csv", "data/tasks.csv");
+    copyFile("data/backup/trash.csv", "data/trash.csv");
+    copyFile("data/backup/users.csv", "data/users.csv");
+    cout << "  Data restored from data/backup/\n";
 }
 
 void FileManager::clearAllTasks() {
