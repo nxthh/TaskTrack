@@ -6,13 +6,12 @@
 #include <tabulate/table.hpp>
 #include <vector>
 
-namespace fs = std::filesystem; 
+namespace fs = std::filesystem;
 
 using namespace std;
 using namespace tabulate;
 
-// ── Platform clear-screen
-// ─────────────────────────────────────────────────────
+// ── Platform clear-screen ────────────────────────────────────────────────────
 
 void System::clearScreen() {
 #ifdef _WIN32
@@ -23,17 +22,13 @@ void System::clearScreen() {
 }
 
 void System::pauseScreen() {
-    std::cout << "\n  Press Enter to continue...";
-    // If there's already a newline buffered (e.g. after readInt),
-    // ignore it first, then wait for a real Enter press.
-    if (std::cin.peek() == '\n') {
-        std::cin.ignore();
-    }
-    std::cin.get();
+  std::cout << "\n  Press Enter to continue...";
+  if (std::cin.peek() == '\n')
+    std::cin.ignore();
+  std::cin.get();
 }
 
-// ── Input helpers
-// ─────────────────────────────────────────────────────────────
+// ── Input helpers ────────────────────────────────────────────────────────────
 
 static void clearInput() {
   cin.clear();
@@ -43,12 +38,10 @@ static void clearInput() {
 static int readInt(const string &prompt) {
   int v;
   cout << prompt;
-
   while (!(cin >> v)) {
     clearInput();
     cout << "  Please enter a number: ";
   }
-
   return v;
 }
 
@@ -56,10 +49,8 @@ static int readInt(const string &prompt) {
 
 static void showMenu(const string &title,
                      const vector<pair<string, string>> &items) {
-
   Table menu;
 
-  // Title
   menu.add_row({title});
   menu[0][0]
       .format()
@@ -67,12 +58,9 @@ static void showMenu(const string &title,
       .font_color(Color::cyan)
       .font_align(FontAlign::center);
 
-  // Items
-  for (const auto &item : items) {
+  for (const auto &item : items)
     menu.add_row({item.first + ". " + item.second});
-  }
 
-  // Style
   menu.format()
       .border_top("-")
       .border_bottom("-")
@@ -84,17 +72,14 @@ static void showMenu(const string &title,
   cout << menu << "\n";
 }
 
-// ── Auth menu
-// ─────────────────────────────────────────────────────────────────
+// ── Auth menu ────────────────────────────────────────────────────────────────
 
 void System::showAuthMenu() {
   clearScreen();
-
   showMenu("TASK TRACK", {{"1", "Login"}, {"2", "Sign Up"}, {"0", "Exit"}});
 }
 
-// ── Dashboard
-// ─────────────────────────────────────────────────────────────────
+// ── Dashboard ────────────────────────────────────────────────────────────────
 
 void System::handleDashboard() {
   auto *u = auth.getUser();
@@ -105,51 +90,28 @@ void System::handleDashboard() {
 
   int completed = tasks.completedTasks(owner, admin);
   int pending = tasks.pendingTasks(owner, admin);
-  int total = admin ? tasks.totalTasks() : (completed + pending);
-
-  Table t;
-
-  t.add_row({"Metric", "Count"});
-  t[0].format().font_style({FontStyle::bold}).font_color(Color::cyan);
-
-  if (admin) {
-    t.add_row({"Total Tasks (system-wide)", to_string(tasks.totalTasks())});
-    t.add_row({"Completed Tasks (yours)", to_string(completed)});
-    t.add_row({"Pending Tasks (yours)", to_string(pending)});
-  } else {
-    t.add_row({"Completed Tasks", to_string(completed)});
-    t.add_row({"Pending Tasks", to_string(pending)});
-  }
-
-  t.format()
-      .border_top("-")
-      .border_bottom("-")
-      .border_left("|")
-      .border_right("|")
-      .corner("+");
+  int total = completed + pending;
 
   cout << "\n=== Dashboard - " << owner << " ===\n\n";
-  cout << t << "\n";
+  tasks.printDashboardTable(owner, admin, completed, pending, total);
 
-  // Progress bar
   if (total > 0) {
     int barWidth = 30;
     int filled = completed * barWidth / total;
+    int pct = completed * 100 / total;
 
     cout << "Progress: [";
-
-    for (int i = 0; i < barWidth; i++) {
+    for (int i = 0; i < barWidth; i++)
       cout << (i < filled ? "#" : "-");
-    }
-
-    cout << "] " << (completed * 100 / total) << "% complete\n";
+    cout << "] " << pct << "% complete\n";
+  } else {
+    cout << "Progress: (no tasks yet)\n";
   }
 
   pauseScreen();
 }
 
-// ── Task menu
-// ─────────────────────────────────────────────────────────────────
+// ── Task menu ────────────────────────────────────────────────────────────────
 
 void System::handleTaskMenu() {
   auto *u = auth.getUser();
@@ -157,10 +119,8 @@ void System::handleTaskMenu() {
   string owner = u->getUsername();
 
   int ch;
-
   do {
     clearScreen();
-
     showMenu("TASK MENU", {{"1", "View All Tasks"},
                            {"2", "Add Task"},
                            {"3", "Edit Task"},
@@ -181,38 +141,28 @@ void System::handleTaskMenu() {
     } else if (ch == 3) {
       clearScreen();
       tasks.showAll(owner, admin);
-
       tasks.editTask(readInt("  Task ID to edit: "), owner, admin);
-
       pauseScreen();
     } else if (ch == 4) {
       clearScreen();
       tasks.showAll(owner, admin);
-
       tasks.deleteTask(readInt("  Task ID to delete: "), owner, admin);
-
       pauseScreen();
     } else if (ch == 5) {
       clearScreen();
       tasks.showAll(owner, admin);
-
       tasks.advanceStatus(readInt("  Task ID to advance: "), owner, admin);
-
       pauseScreen();
     }
-
   } while (ch != 0);
 }
 
-// ── Recovery menu
-// ─────────────────────────────────────────────────────────────
+// ── Recovery menu ────────────────────────────────────────────────────────────
 
 void System::handleRecoveryMenu() {
   int ch;
-
   do {
     clearScreen();
-
     showMenu("RECOVERY", {{"1", "View Deleted Tasks"},
                           {"2", "Restore Task"},
                           {"3", "Permanently Delete Task"},
@@ -227,30 +177,23 @@ void System::handleRecoveryMenu() {
     } else if (ch == 2) {
       clearScreen();
       tasks.showTrash();
-
       tasks.restoreTask(readInt("  Task ID to restore: "));
-
       pauseScreen();
     } else if (ch == 3) {
       clearScreen();
       tasks.showTrash();
-
       tasks.permanentDelete(readInt("  Task ID to permanently delete: "));
-
       pauseScreen();
     }
-
   } while (ch != 0);
 }
 
-// ── Admin - user management ──────────────────────────────────────────────────
+// ── Admin – user management ──────────────────────────────────────────────────
 
 void System::handleAdminUserMenu() {
   int ch;
-
   do {
     clearScreen();
-
     showMenu("USER MANAGEMENT", {{"1", "View All Users"},
                                  {"2", "Search User"},
                                  {"3", "Delete User"},
@@ -266,65 +209,44 @@ void System::handleAdminUserMenu() {
       pauseScreen();
     } else if (ch == 2) {
       clearScreen();
-
       string kw;
-
       cout << "  Keyword: ";
       cin >> kw;
-
       auth.searchUser(kw);
-
       pauseScreen();
     } else if (ch == 3) {
       clearScreen();
-
       auth.viewAllUsers();
-
       string u;
-
       cout << "  Username to delete: ";
       cin >> u;
-
       auth.deleteUser(u);
-
       pauseScreen();
     } else if (ch == 4) {
       clearScreen();
-
       string u;
-
       cout << "  Username: ";
       cin >> u;
-
       auth.resetPassword(u);
-
       pauseScreen();
     } else if (ch == 5) {
       clearScreen();
-
       cout << "  Clear all non-admin users? (y/n): ";
-
       char c;
       cin >> c;
-
-      if (c == 'y' || c == 'Y') {
+      if (c == 'y' || c == 'Y')
         auth.clearAllUsers();
-      }
-
       pauseScreen();
     }
-
   } while (ch != 0);
 }
 
-// ── Admin - data management ──────────────────────────────────────────────────
+// ── Admin – data management ──────────────────────────────────────────────────
 
 void System::handleAdminDataMenu() {
   int ch;
-
   do {
     clearScreen();
-
     showMenu("DATA MANAGEMENT", {{"1", "Backup Data"},
                                  {"2", "Restore from Backup"},
                                  {"3", "Clear All Tasks"},
@@ -334,36 +256,26 @@ void System::handleAdminDataMenu() {
 
     if (ch == 1) {
       clearScreen();
-
       FileManager::backup();
-
       pauseScreen();
     } else if (ch == 2) {
       clearScreen();
-
       cout << "  Restore from backup? "
            << "Current data will be overwritten. (y/n): ";
-
       char c;
       cin >> c;
-
       if (c == 'y' || c == 'Y') {
         FileManager::restore();
-
         tasks.loadFromFile();
         tasks.loadTrash();
         auth.loadFromFile();
       }
-
       pauseScreen();
     } else if (ch == 3) {
       clearScreen();
-
       tasks.clearAllTasks();
-
       pauseScreen();
     }
-
   } while (ch != 0);
 }
 
@@ -373,10 +285,8 @@ void System::showUserMenu() {
   auto *u = auth.getUser();
 
   int ch;
-
   do {
     clearScreen();
-
     showMenu("TASK TRACK - " + u->getUsername(), {{"1", "Tasks"},
                                                   {"2", "Dashboard"},
                                                   {"3", "Recovery"},
@@ -384,17 +294,16 @@ void System::showUserMenu() {
 
     ch = readInt("Choice: ");
 
-    if (ch == 1) {
+    if (ch == 1)
       handleTaskMenu();
-    } else if (ch == 2) {
+    else if (ch == 2)
       handleDashboard();
-    } else if (ch == 3) {
+    else if (ch == 3)
       handleRecoveryMenu();
-    } else if (ch == 4) {
+    else if (ch == 4) {
       auth.logout();
       return;
     }
-
   } while (ch != 0 && auth.isLoggedIn());
 }
 
@@ -402,10 +311,8 @@ void System::showUserMenu() {
 
 void System::showAdminMenu() {
   int ch;
-
   do {
     clearScreen();
-
     showMenu("TASK TRACK - ADMIN", {{"1", "Tasks"},
                                     {"2", "Dashboard"},
                                     {"3", "Recovery"},
@@ -415,32 +322,30 @@ void System::showAdminMenu() {
 
     ch = readInt("Choice: ");
 
-    if (ch == 1) {
+    if (ch == 1)
       handleTaskMenu();
-    } else if (ch == 2) {
+    else if (ch == 2)
       handleDashboard();
-    } else if (ch == 3) {
+    else if (ch == 3)
       handleRecoveryMenu();
-    } else if (ch == 4) {
+    else if (ch == 4)
       handleAdminUserMenu();
-    } else if (ch == 5) {
+    else if (ch == 5)
       handleAdminDataMenu();
-    } else if (ch == 6) {
+    else if (ch == 6) {
       auth.logout();
       return;
     }
-
   } while (ch != 0 && auth.isLoggedIn());
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 void System::run() {
-
   try {
     fs::path dir = fs::current_path();
     bool found = false;
-    for (int i = 0; i < 5; ++i) { // max 5 levels up
+    for (int i = 0; i < 5; ++i) {
       if (fs::exists(dir / "CMakeLists.txt")) {
         fs::current_path(dir);
         std::cout << "  Working directory: " << fs::current_path().string()
@@ -450,13 +355,12 @@ void System::run() {
       }
       fs::path parent = dir.parent_path();
       if (parent == dir)
-        break; // reached filesystem root
+        break;
       dir = parent;
     }
-    if (!found) {
-      std::cerr << "  Warning: could not locate project root, "
-                   "using current directory.\n";
-    }
+    if (!found)
+      std::cerr << "  Warning: could not locate project root, using current "
+                   "directory.\n";
   } catch (const std::exception &e) {
     std::cerr << "  Warning: " << e.what() << " — using current directory.\n";
   }
@@ -468,37 +372,28 @@ void System::run() {
   tasks.loadTrash();
 
   int ch;
-
   do {
     showAuthMenu();
-
     ch = readInt("Choice: ");
 
     if (ch == 1) {
       clearScreen();
-
       if (auth.login()) {
         pauseScreen();
-
-        if (auth.getUser()->isAdmin()) {
+        if (auth.getUser()->isAdmin())
           showAdminMenu();
-        } else {
+        else
           showUserMenu();
-        }
       } else {
         pauseScreen();
       }
     } else if (ch == 2) {
       clearScreen();
-
       auth.signup();
-
       pauseScreen();
     }
-
   } while (ch != 0);
 
   clearScreen();
-
   cout << "\n  Goodbye!\n\n";
 }
