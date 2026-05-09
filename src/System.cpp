@@ -82,6 +82,7 @@ void System::renderUI(const string& bannerType, const string& subTitle, const ve
     SetConsoleTextAttribute(h, 7); 
     cout << " " << line << "\n";
 
+
     for (const auto& opt : options) {
         printf(" | %-3s | %-50s |\n", opt.first.c_str(), opt.second.c_str());
         cout << " " << line << "\n";
@@ -202,6 +203,7 @@ void System::handleTaskMenu() {
 
 // ── Recovery Logic ───────────────────────────────────────────────────────────
 
+
 void System::handleRecoveryMenu() {
     int ch;
     do {
@@ -284,6 +286,7 @@ void System::handleAdminDataMenu() {
 }
 
 // ── Normal user menu ──────────────────────────────────────────────────────────
+
 
 void System::showUserMenu() {
     auto* u = auth.getUser();
