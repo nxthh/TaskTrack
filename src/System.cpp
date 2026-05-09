@@ -208,21 +208,40 @@ void System::handleTaskMenu() {
 // ── Recovery Logic ───────────────────────────────────────────────────────────
 
 
-void System::handleRecoveryMenu() {
+ // 1. Update the function to accept these parameters
+
+  void System::handleRecoveryMenu() {
+    // These 3 lines fix the "undefined identifier" and "argument" errors
+    auto* u = auth.getUser();
+    string owner = u->getUsername();
+    bool admin = u->isAdmin();
     int ch;
+
     do {
         renderUI("RECOVERY", "RECOVERY CENTER & TRASH", {
             {"1", "View Deleted Tasks"},
             {"2", "Restore Deleted Task"},
             {"3", "Permanent Data Tasks"},
             {"0", "Back"}
-        });
+        }); // Added ')' here to fix the red line in Screenshot 040417
 
         ch = readInt(" >> Choice: ");
 
-        if (ch == 1) { clearScreen(); tasks.showTrash(); pauseScreen(); }
-        else if (ch == 2) { clearScreen(); tasks.showTrash(); tasks.restoreTask(readInt(" ID: ")); pauseScreen(); }
-        else if (ch == 3) { clearScreen(); tasks.showTrash(); tasks.permanentDelete(readInt(" ID: ")); pauseScreen(); }
+        if (ch == 1) { 
+            clearScreen(); tasks.showTrash(); pauseScreen(); 
+        }
+        else if (ch == 2) { 
+            clearScreen(); tasks.showTrash(); 
+            // Added owner/admin here to match TaskManager requirements
+            tasks.restoreTask(readInt(" ID: "), owner, admin); 
+            pauseScreen(); 
+        }
+        else if (ch == 3) { 
+            clearScreen(); tasks.showTrash(); 
+            // Added owner/admin here to match TaskManager requirements
+            tasks.permanentDelete(readInt(" ID: "), owner, admin); 
+            pauseScreen(); 
+        }
     } while (ch != 0);
 }
 
