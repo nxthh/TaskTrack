@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.14)
 project(TaskTrack)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static")
+
+# Static linking: Windows-only (full static breaks glibc on Linux)
+if(WIN32)
+    set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static")
+endif()
+
 include(FetchContent)
 FetchContent_Declare(
     tabulate
@@ -10,6 +15,7 @@ FetchContent_Declare(
     GIT_TAG        master
 )
 FetchContent_MakeAvailable(tabulate)
+
 add_executable(TaskTrack
     src/main.cpp
     src/FileManager.cpp
@@ -17,10 +23,12 @@ add_executable(TaskTrack
     src/TaskManager.cpp
     src/AuthManager.cpp
 )
+
 target_include_directories(TaskTrack PRIVATE
     include
     ${tabulate_SOURCE_DIR}/include
 )
+
 target_link_libraries(TaskTrack PRIVATE
     tabulate::tabulate
 )

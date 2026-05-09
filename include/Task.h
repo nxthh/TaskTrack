@@ -8,9 +8,15 @@ using std::cout;
 using std::cin;
 
 inline std::string todayDate() {
-    time_t t = time(0);
-    tm now;
+    time_t t = time(nullptr);
+    tm now{};
+
+#ifdef _WIN32
     localtime_s(&now, &t);
+#else
+    localtime_r(&t, &now);
+#endif
+
     char buf[11];
     strftime(buf, sizeof(buf), "%Y-%m-%d", &now);
     return std::string(buf);
