@@ -9,6 +9,19 @@ using namespace tabulate;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+// Returns the next free ID for a specific user, scanning both active tasks
+// and trash so IDs never collide even after deletions.
+int TaskManager::nextIdForUser(const string &owner) const {
+  int id = 1;
+  for (auto &t : tasks)
+    if (t.getAssignee() == owner && t.getId() >= id)
+      id = t.getId() + 1;
+  for (auto &t : trash)
+    if (t.getAssignee() == owner && t.getId() >= id)
+      id = t.getId() + 1;
+  return id;
+}
+
 void TaskManager::recomputeNextId() {
   nextId = 1;
   for (auto &t : tasks)
@@ -27,24 +40,13 @@ static string priorityBadge(const string &p) {
   return "[L] Low";
 }
 
-// Returns the tabulate Color for a given status string
-static Color statusColor(const string &s) {
-  if (s == "Done")
-    return Color::green;
-  if (s == "In-Progress")
-    return Color::yellow;
-  return Color::white; // To-Do
-}
-
-// Prints a status label to stdout with ANSI colour, then resets
 static void printColoredStatus(const string &s) {
-  // ANSI codes: yellow = 33, green = 32, white/reset = 0
   if (s == "Done")
     cout << "\033[32m" << s << "\033[0m";
   else if (s == "In-Progress")
     cout << "\033[33m" << s << "\033[0m";
   else
-    cout << s; // To-Do — no colour
+    cout << s;
 }
 
 void TaskManager::printTable(const vector<Task> &list) const {
@@ -102,16 +104,15 @@ void TaskManager::loadFromFile() {
 }
 
 void TaskManager::saveToFile() const { FileManager::saveTasks(tasks); }
-
 void TaskManager::loadTrash() { trash = FileManager::loadTrash(); }
-
 void TaskManager::saveTrash() const { FileManager::saveTrash(trash); }
 
-// ── CRUD ─────────────────────────────────────────────────────────────────────
+// ── CRUD
+// ──────────────────────────────────────────────────────────────────────
 
 void TaskManager::addTask(const string &ownerUsername) {
   Task t;
-  t.input(ownerUsername, nextId++);
+  t.input(ownerUsername, nextIdForUser(ownerUsername));
   tasks.push_back(t);
   saveToFile();
   cout << "  Task added (ID: " << t.getId() << ").\n";
@@ -119,11 +120,7 @@ void TaskManager::addTask(const string &ownerUsername) {
 
 void TaskManager::editTask(int id, const string &owner, bool isAdmin) {
   for (auto &t : tasks) {
-    if (t.getId() == id) {
-      if (!isAdmin && t.getAssignee() != owner) {
-        cout << "  Permission denied.\n";
-        return;
-      }
+    if (t.getId() == id && (isAdmin || t.getAssignee() == owner)) {
       t.edit();
       saveToFile();
       cout << "  Task updated.\n";
@@ -134,14 +131,11 @@ void TaskManager::editTask(int id, const string &owner, bool isAdmin) {
 }
 
 void TaskManager::deleteTask(int id, const string &owner, bool isAdmin) {
-  auto it = find_if(tasks.begin(), tasks.end(),
-                    [&](Task &t) { return t.getId() == id; });
+  auto it = find_if(tasks.begin(), tasks.end(), [&](const Task &t) {
+    return t.getId() == id && (isAdmin || t.getAssignee() == owner);
+  });
   if (it == tasks.end()) {
     cout << "  Task not found.\n";
-    return;
-  }
-  if (!isAdmin && it->getAssignee() != owner) {
-    cout << "  Permission denied.\n";
     return;
   }
   it->setDeleted(true);
@@ -163,12 +157,7 @@ void TaskManager::showAll(const string &owner, bool isAdmin) const {
 
 void TaskManager::advanceStatus(int id, const string &owner, bool isAdmin) {
   for (auto &t : tasks) {
-    if (t.getId() == id) {
-      if (!isAdmin && t.getAssignee() != owner) {
-        cout << "  Permission denied.\n";
-        return;
-      }
-
+    if (t.getId() == id && (isAdmin || t.getAssignee() == owner)) {
       string before = t.getStatus();
       t.advanceStatus();
       string after = t.getStatus();
@@ -211,9 +200,6 @@ int TaskManager::pendingTasks(const string &owner, bool isAdmin) const {
   return cnt;
 }
 
-// ── Dashboard table with colored counts
-// ──────────────────────────────────────
-
 void TaskManager::printDashboardTable(const string &owner, bool isAdmin,
                                       int completed, int pending,
                                       int total) const {
@@ -225,15 +211,11 @@ void TaskManager::printDashboardTable(const string &owner, bool isAdmin,
     t.add_row({"Total Tasks (system-wide)", to_string(totalTasks())});
     t.add_row({"Completed Tasks (yours)", to_string(completed)});
     t.add_row({"Pending Tasks (yours)", to_string(pending)});
-
-    // colour the completed row green (row index 2)
     t[2][1].format().font_color(Color::green);
   } else {
     t.add_row({"Completed Tasks", to_string(completed)});
     t.add_row({"Pending Tasks", to_string(pending)});
     t.add_row({"Total Tasks", to_string(total)});
-
-    // colour the completed row green (row index 1)
     t[1][1].format().font_color(Color::green);
   }
 
@@ -255,9 +237,24 @@ void TaskManager::showTrash() const {
   printTable(trash);
 }
 
-void TaskManager::restoreTask(int id) {
-  auto it = find_if(trash.begin(), trash.end(),
-                    [&](Task &t) { return t.getId() == id; });
+// Overload used by System to show only the calling user's trash
+void TaskManager::showTrashFor(const string &owner, bool isAdmin) const {
+  cout << "\n=== Recovery (Trash) ===";
+  if (isAdmin) {
+    printTable(trash);
+  } else {
+    vector<Task> mine;
+    for (auto &t : trash)
+      if (t.getAssignee() == owner)
+        mine.push_back(t);
+    printTable(mine);
+  }
+}
+
+void TaskManager::restoreTask(int id, const string &owner, bool isAdmin) {
+  auto it = find_if(trash.begin(), trash.end(), [&](const Task &t) {
+    return t.getId() == id && (isAdmin || t.getAssignee() == owner);
+  });
   if (it == trash.end()) {
     cout << "  Task not found in Recovery.\n";
     return;
@@ -270,9 +267,10 @@ void TaskManager::restoreTask(int id) {
   cout << "  Task restored successfully.\n";
 }
 
-void TaskManager::permanentDelete(int id) {
-  auto it = find_if(trash.begin(), trash.end(),
-                    [&](Task &t) { return t.getId() == id; });
+void TaskManager::permanentDelete(int id, const string &owner, bool isAdmin) {
+  auto it = find_if(trash.begin(), trash.end(), [&](const Task &t) {
+    return t.getId() == id && (isAdmin || t.getAssignee() == owner);
+  });
   if (it == trash.end()) {
     cout << "  Task not found in Recovery.\n";
     return;
@@ -302,9 +300,6 @@ void TaskManager::emptyTrash() {
     cout << "  Recovery emptied.\n";
   }
 }
-
-// ── Admin clear
-// ───────────────────────────────────────────────────────────────
 
 void TaskManager::clearAllTasks() {
   cout << "  Clear ALL tasks and Recovery? (y/n): ";

@@ -11,6 +11,7 @@ private:
   int nextId = 1;
 
   void recomputeNextId();
+  int nextIdForUser(const string &owner) const; // per-user ID counter
   void printTable(const vector<Task> &list) const;
 
 public:
@@ -34,14 +35,15 @@ public:
   int completedTasks(const string &ownerUsername, bool isAdmin) const;
   int pendingTasks(const string &ownerUsername, bool isAdmin) const;
 
-  // ── Dashboard table (with coloured completed count) ───────
+  // ── Dashboard table (coloured completed count) ────────────
   void printDashboardTable(const string &ownerUsername, bool isAdmin,
                            int completed, int pending, int total) const;
 
   // ── Trash / Recovery ──────────────────────────────────────
   void showTrash() const;
-  void restoreTask(int id);
-  void permanentDelete(int id);
+  void showTrashFor(const string &ownerUsername, bool isAdmin) const;
+  void restoreTask(int id, const string &ownerUsername, bool isAdmin);
+  void permanentDelete(int id, const string &ownerUsername, bool isAdmin);
   void emptyTrash();
 
   // ── Admin clear ───────────────────────────────────────────

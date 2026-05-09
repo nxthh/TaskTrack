@@ -160,6 +160,10 @@ void System::handleTaskMenu() {
 // ── Recovery menu ────────────────────────────────────────────────────────────
 
 void System::handleRecoveryMenu() {
+  auto *u = auth.getUser();
+  bool admin = u->isAdmin();
+  string owner = u->getUsername();
+
   int ch;
   do {
     clearScreen();
@@ -172,17 +176,18 @@ void System::handleRecoveryMenu() {
 
     if (ch == 1) {
       clearScreen();
-      tasks.showTrash();
+      tasks.showTrashFor(owner, admin);
       pauseScreen();
     } else if (ch == 2) {
       clearScreen();
-      tasks.showTrash();
-      tasks.restoreTask(readInt("  Task ID to restore: "));
+      tasks.showTrashFor(owner, admin);
+      tasks.restoreTask(readInt("  Task ID to restore: "), owner, admin);
       pauseScreen();
     } else if (ch == 3) {
       clearScreen();
-      tasks.showTrash();
-      tasks.permanentDelete(readInt("  Task ID to permanently delete: "));
+      tasks.showTrashFor(owner, admin);
+      tasks.permanentDelete(readInt("  Task ID to permanently delete: "), owner,
+                            admin);
       pauseScreen();
     }
   } while (ch != 0);
