@@ -2,25 +2,37 @@
 #include "FileManager.h"
 #include <iostream>
 #include <algorithm>
+#include <cctype> 
 #include <tabulate/table.hpp>
 
 using namespace std;
 using namespace tabulate;
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 bool AuthManager::usernameExists(const string& u) const {
-    for (auto& user : users)
+    for (const auto& user : users)
         if (user.getUsername() == u) return true;
     return false;
+}
+
+// Requirement 1: Full Name validation (letters and spaces only)
+static bool isValidFullName(const string& name) {
+    if (name.empty()) return false;
+    for (char c : name) {
+        if (!isalpha(static_cast<unsigned char>(c)) && !isspace(static_cast<unsigned char>(c))) 
+            return false;
+    }
+    return true;
 }
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
 void AuthManager::loadFromFile() {
     users = FileManager::loadUsers();
+    // Requirement 6: Seed default admin if file is empty
     if (users.empty()) {
-        cout << "  No users found. Creating default admin account.\n";
+        cout << "   [System] No users found. Creating default admin account.\n";
         users.emplace_back("admin", "admin123", "Administrator", "N/A", Role::Admin);
         FileManager::saveUsers(users);
     }
@@ -30,132 +42,187 @@ void AuthManager::saveToFile() const {
     FileManager::saveUsers(users);
 }
 
-// ── Auth ─────────────────────────────────────────────────────────────────────
+// ── Authentication (Requirement 1) ───────────────────────────────────────────
 
 bool AuthManager::signup() {
-    string username, password, fullName, gender;
-    cout << "\n--- Sign Up ---\n";
-    cout << "Username: ";
-    cin >> username;
+    string username, password, fullName, gender, roleInput;
+    Role selectedRole = Role::User;
 
+    cout << "\n--- Sign Up ---\n";
+
+    // 1. Username Validation
+    cout << "   Username (no spaces): ";
+    cin >> username;
     if (usernameExists(username)) {
-        cout << "  Username already taken.\n";
+        cout << "   Error: Username already taken.\n";
         return false;
     }
 
-    cout << "Password: ";
+    // 2. Password Validation (Requirement: Min 6 characters)
+    cout << "   Password (min 6 chars): ";
     cin >> password;
-    cin.ignore();
+    if (password.length() < 6) {
+        cout << "   Error: Password too short! Must be at least 6 characters.\n";
+        return false;
+    }
 
-    cout << "Full Name: ";
+    cin.ignore(1000, '\n'); // Clear buffer for getline
+
+    // 3. Full Name Validation (Requirement: Letters and spaces only)
+    cout << "   Full Name: ";
     getline(cin, fullName);
+    if (!isValidFullName(fullName)) {
+        cout << "   Error: Full name must contain only letters and spaces.\n";
+        return false;
+    }
 
-    cout << "Gender (M / F / Other): ";
+    cout << "   Gender (M / F / Other): ";
     cin >> gender;
 
-    // All sign-ups are regular Users — only the seeded admin account is Admin
-    users.emplace_back(username, password, fullName, gender, Role::User);
+    // 4. Role Selection (Requirement: Admin / User)
+    cout << "   Register as (Admin / User): ";
+    cin >> roleInput;
+    
+    // Normalize input to lowercase
+    for (char &c : roleInput) c = (char)tolower((unsigned char)c);
+
+    if (roleInput == "admin") {
+        selectedRole = Role::Admin;
+    } else if (roleInput == "user") {
+        selectedRole = Role::User;
+    } else {
+        cout << "   Error: Invalid role. Use 'Admin' or 'User'.\n";
+        return false;
+    }
+
+    users.emplace_back(username, password, fullName, gender, selectedRole);
     saveToFile();
-    cout << "  Account created! Please log in.\n";
+    cout << "   Account created successfully! You can now log in.\n";
     return true;
 }
 
 bool AuthManager::login() {
     string username, password;
     cout << "\n--- Login ---\n";
-    cout << "Username: ";
+    cout << "   Username: ";
     cin >> username;
-    cout << "Password: ";
+    cout << "   Password: ";
     cin >> password;
 
     for (auto& u : users) {
         if (u.getUsername() == username && u.getPassword() == password) {
-            currentUser = &u;
-            cout << "  Welcome, " << u.getFullName()
-                 << "! (" << u.getRoleStr() << ")\n";
+            currentUser = &u; // Set session
+            cout << "   Welcome back, " << u.getFullName() << "!\n";
+            cout << "   Access Level: [" << u.getRoleStr() << "]\n";
             return true;
         }
     }
-    cout << "  Invalid username or password.\n";
+    cout << "   Error: Invalid credentials.\n";
     return false;
 }
 
 void AuthManager::logout() {
     if (currentUser)
-        cout << "  Goodbye, " << currentUser->getFullName() << "!\n";
+        cout << "   Goodbye, " << currentUser->getFullName() << ". Session closed.\n";
     currentUser = nullptr;
 }
 
-// ── Admin features ───────────────────────────────────────────────────────────
+// ── Admin Features (Requirement 4/6) ─────────────────────────────────────────
 
 void AuthManager::viewAllUsers() const {
+    if (users.empty()) {
+        cout << "   No users registered.\n";
+        return;
+    }
+
     Table t;
     t.add_row({"Username", "Full Name", "Gender", "Role"});
     t[0].format()
         .font_style({FontStyle::bold})
         .font_color(Color::cyan);
 
-    for (auto& u : users)
+    for (const auto& u : users)
         t.add_row({u.getUsername(), u.getFullName(), u.getGender(), u.getRoleStr()});
 
     cout << "\n" << t << "\n";
 }
 
 void AuthManager::deleteUser(const string& username) {
+    // Safety check: Don't lock out the system
     if (username == "admin") {
-        cout << "  Cannot delete the primary admin account.\n";
+        cout << "   Error: The primary admin account cannot be deleted.\n";
         return;
     }
+
     auto it = find_if(users.begin(), users.end(),
         [&](const User& u){ return u.getUsername() == username; });
-    if (it == users.end()) { cout << "  User not found.\n"; return; }
-    users.erase(it);
-    if (currentUser && currentUser->getUsername() == username)
+    
+    if (it == users.end()) { 
+        cout << "   Error: User '" << username << "' not found.\n"; 
+        return; 
+    }
+
+    // Logout if deleting self
+    if (currentUser && currentUser->getUsername() == username) {
         currentUser = nullptr;
+    }
+
+    users.erase(it);
     saveToFile();
-    cout << "  User '" << username << "' deleted.\n";
+    cout << "   User successfully removed from system.\n";
 }
 
 void AuthManager::resetPassword(const string& username) {
     for (auto& u : users) {
         if (u.getUsername() == username) {
             string newPw;
-            cout << "  New password for " << username << ": ";
+            cout << "   New password for " << username << " (min 6 chars): ";
             cin >> newPw;
+            if (newPw.length() < 6) {
+                cout << "   Error: Reset failed. Password too short.\n";
+                return;
+            }
             u.setPassword(newPw);
             saveToFile();
-            cout << "  Password reset.\n";
+            cout << "   Password reset successfully.\n";
             return;
         }
     }
-    cout << "  User not found.\n";
+    cout << "   Error: User not found.\n";
 }
 
 void AuthManager::searchUser(const string& keyword) const {
     Table t;
     t.add_row({"Username", "Full Name", "Gender", "Role"});
-    t[0].format()
-        .font_style({FontStyle::bold})
-        .font_color(Color::cyan);
+    t[0].format().font_style({FontStyle::bold}).font_color(Color::cyan);
 
     bool found = false;
-    for (auto& u : users) {
+    for (const auto& u : users) {
+        // Search in both username and full name
         if (u.getUsername().find(keyword) != string::npos ||
             u.getFullName().find(keyword)  != string::npos) {
             t.add_row({u.getUsername(), u.getFullName(), u.getGender(), u.getRoleStr()});
             found = true;
         }
     }
-    if (!found) cout << "  No users found matching '" << keyword << "'.\n";
-    else        cout << "\n" << t << "\n";
+
+    if (!found) {
+        cout << "   No users matched keyword: '" << keyword << "'.\n";
+    } else {
+        cout << "\n" << t << "\n";
+    }
 }
 
 void AuthManager::clearAllUsers() {
-    vector<User> admins;
-    for (auto& u : users)
-        if (u.isAdmin()) { admins.push_back(u); break; }
-    users = admins;
-    currentUser = users.empty() ? nullptr : &users[0];
-    saveToFile();
-    cout << "  All non-admin users cleared.\n";
+    cout << "   Wiping all non-admin data. Proceed? (y/n): ";
+    char confirm;
+    cin >> confirm;
+    if (confirm == 'y' || confirm == 'Y') {
+        // Use erase-remove_if to keep only Admins
+        users.erase(remove_if(users.begin(), users.end(), 
+            [](const User& u) { return !u.isAdmin(); }), users.end());
+        
+        saveToFile();
+        cout << "   All user records cleared. Admin accounts preserved.\n";
+    }
 }

@@ -4,37 +4,32 @@
 #include "Task.h"
 #include "User.h"
 
-using std::vector;
-using std::string;
-
 class FileManager {
 public:
-    // ── Tasks ─────────────────────────────────────────────────────
-    static void         saveTasks(const vector<Task>& tasks,
-                                  const string& path = "data/tasks.csv");
-    static vector<Task> loadTasks(const string& path = "data/tasks.csv");
+    // ── System Initialization ─────────────────────────────────
+    // Fixed: static ensures System.cpp line 370 works
+    static void ensureDataDir();
 
-    // ── Trash (soft-deleted tasks) ────────────────────────────────
-    static void         saveTrash(const vector<Task>& trash,
-                                  const string& path = "data/trash.csv");
-    static vector<Task> loadTrash(const string& path = "data/trash.csv");
+    // ── Task Management ───────────────────────────────────────
+    static void saveTasks(const std::vector<Task>& tasks, const std::string& path = "data/tasks.csv");
+    static std::vector<Task> loadTasks(const std::string& path = "data/tasks.csv");
+    
+    // ── Trash Management ──────────────────────────────────────
+    static void saveTrash(const std::vector<Task>& trash, const std::string& path = "data/trash.csv");
+    static std::vector<Task> loadTrash(const std::string& path = "data/trash.csv");
+    
+    // ── User Management ───────────────────────────────────────
+    static void saveUsers(const std::vector<User>& users, const std::string& path = "data/users.csv");
+    static std::vector<User> loadUsers(const std::string& path = "data/users.csv");
 
-    // ── Users ─────────────────────────────────────────────────────
-    static void         saveUsers(const vector<User>& users,
-                                  const string& path = "data/users.csv");
-    static vector<User> loadUsers(const string& path = "data/users.csv");
-
-    // ── Backup / Restore ──────────────────────────────────────────
+    // ── System Tools ──────────────────────────────────────────
     static void backup();
     static void restore();
     static void clearAllTasks();
     static void clearAllUsers();
 
-    // ── Utility ───────────────────────────────────────────────────
-    static void ensureDataDir();
-
 private:
-    static string readFile(const string& path);
-    static void   writeFile(const string& path, const string& content);
-    static bool   copyFile(const string& src, const string& dst);
+    static std::string readFile(const std::string& path);
+    static void writeFile(const std::string& path, const std::string& content);
+    static bool copyFile(const std::string& src, const std::string& dst);
 };

@@ -12,7 +12,7 @@ private:
     // ── UI Visual Engine ──────────────────────────────────────
     /**
      * Renders the Patorjk ASCII banners and styled menu boxes.
-     * @param bannerType "MAIN", "USER", "ADMIN", or "RECOVERY"
+     * @param bannerType "MAIN", "USER", "ADMIN", "RECOVERY", or "EXIT"
      * @param subTitle The text displayed in the INFO section of the box
      * @param options A list of {ID, Description} pairs for the menu
      */
@@ -29,14 +29,24 @@ private:
     void showUserMenu();
     void showAdminMenu();
 
-    // ── Sub-menus ─────────────────────────────────────────────
-    void handleTaskMenu();
-    void handleDashboard();
-    void handleAdminUserMenu();
-    void handleAdminDataMenu();
-    void handleRecoveryMenu();
+    // ── Sub-menus & Logic Handlers ─────────────────────────────
+    void handleTaskMenu();      // Task Creation, Edit, Delete, Update
+    void handleDashboard();     // Progress bars and stats
+    void handleAdminUserMenu(); // User management (Admin only)
+    void handleAdminDataMenu(); // Backup & Restore (Admin only)
+    void handleRecoveryMenu();  // Trash system (View, Restore, Wipe)
+    
+    /**
+     * New: Handles the sub-logic for Sorting and Filtering tasks
+     * to satisfy requirements for Deadline/Priority/Status.
+     */
+    void handleSortFilterMenu(); 
 
 public:
     // ── Core Execution ────────────────────────────────────────
+    /**
+     * Initializes console settings (UTF-8), loads data from files,
+     * and starts the main application loop.
+     */
     void run();
 };
