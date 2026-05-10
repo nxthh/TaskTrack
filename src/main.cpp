@@ -1,18 +1,12 @@
-#include "../include/System.h" // Point to the include folder
-#include <windows.h>
+#include "../include/System.h"
 
 /**
  * Entry point for the Task Tracking System.
+ * Cross-platform: Windows, Linux, macOS.
+ * Terminal title and UTF-8 setup are handled inside System::run().
  */
 int main() {
-    // Set terminal title (Windows only)
-    SetConsoleTitleA("Task Track - Secure Management System");
-
-    // Create system object
     System taskSystem;
-
-    // Start application
     taskSystem.run();
-
     return 0;
 }

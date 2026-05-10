@@ -3,20 +3,79 @@
 #include <iostream>
 #include <limits>
 #include <vector>
-#include <windows.h>
+#include <thread>
+#include <chrono>
 #include <tabulate/table.hpp>
+
+// ── Cross-Platform Compatibility ─────────────────────────────────────────────
+#ifdef _WIN32
+    #include <windows.h>
+    #define SLEEP_MS(ms) Sleep(ms)
+#else
+    #include <unistd.h>
+    #define SLEEP_MS(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
+#endif
 
 using namespace std;
 using namespace tabulate;
 
+// ── ANSI Color Codes (work on Linux/macOS terminals; Windows 10+ with VT mode) ──
+// Named "Ansi" to avoid collision with tabulate::Color
+namespace Ansi {
+    const string RESET   = "\033[0m";
+    const string CYAN    = "\033[96m";  // replaces SetConsoleTextAttribute(h, 11)
+    const string GREEN   = "\033[92m";  // replaces 10
+    const string YELLOW  = "\033[93m";  // replaces 14
+    const string RED     = "\033[91m";  // replaces 12
+    const string DARKRED = "\033[31m";  // replaces 4
+    const string WHITE   = "\033[97m";  // replaces 7
+}
+
+// Enable ANSI escape codes on Windows 10+ (no-op on Linux/macOS)
+static void enableAnsiSupport() {
+#ifdef _WIN32
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode = 0;
+    if (GetConsoleMode(h, &mode)) {
+        SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    }
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+#endif
+}
+
+static void setTitle(const string& title) {
+#ifdef _WIN32
+    SetConsoleTitleA(title.c_str());
+#else
+    // Sets terminal emulator title via escape sequence
+    cout << "\033]0;" << title << "\007";
+#endif
+}
+
+static void clearScreen() {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
 // ── UI Visual Engine ─────────────────────────────────────────────────────────
 
 void System::renderUI(const string& bannerType, const string& subTitle, const vector<pair<string, string>>& options) {
-    system("cls");
-    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    clearScreen();
+
+    string bannerColor;
+    if      (bannerType == "MAIN")     bannerColor = Ansi::CYAN;
+    else if (bannerType == "USER")     bannerColor = Ansi::GREEN;
+    else if (bannerType == "ADMIN")    bannerColor = Ansi::YELLOW;
+    else if (bannerType == "RECOVERY") bannerColor = Ansi::RED;
+    else if (bannerType == "GOODBYE")  bannerColor = Ansi::DARKRED;
+
+    cout << bannerColor;
 
     if (bannerType == "MAIN") {
-        SetConsoleTextAttribute(h, 11); 
         cout << R"(
   ████████╗ █████╗ ███████╗██╗  ██╗     ████████╗██████╗  █████╗  ██████╗██╗  ██╗
   ╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝     ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
@@ -24,9 +83,8 @@ void System::renderUI(const string& bannerType, const string& subTitle, const ve
      ██║   ██╔══██║╚════██║██╔═██╗         ██║   ██╔══██╗██╔══██║██║     ██╔═██╗ 
      ██║   ██║  ██║███████║██║  ██╗        ██║   ██║  ██║██║  ██║╚██████╗██║  ██╗
      ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝        ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ )" << endl;
-    } 
+    }
     else if (bannerType == "USER") {
-        SetConsoleTextAttribute(h, 10); 
         cout << R"(
   ██████╗  █████╗ ███████╗██╗  ██╗██████╗  ██████╗  █████╗ ██████╗ ██████╗ 
   ██╔══██╗██╔══██╗██╔════╝██║  ██║██╔══██╗██╔═══██╗██╔══██╗██╔══██╗██╔══██╗
@@ -36,7 +94,6 @@ void System::renderUI(const string& bannerType, const string& subTitle, const ve
   ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ )" << endl;
     }
     else if (bannerType == "ADMIN") {
-        SetConsoleTextAttribute(h, 14); 
         cout << R"(
    █████╗ ██████╗ ███╗   ███╗██╗███╗   ██╗    ██████╗  █████╗ ███╗   ██╗███████╗██╗    
   ██╔══██╗██╔══██╗████╗ ████║██║████╗  ██║    ██╔══██╗██╔══██╗████╗  ██║██╔════╝██║    
@@ -46,7 +103,6 @@ void System::renderUI(const string& bannerType, const string& subTitle, const ve
   ╚═╝  ╚═╝╚═════╝ ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝    ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝ )" << endl;
     }
     else if (bannerType == "RECOVERY") {
-        SetConsoleTextAttribute(h, 12); 
         cout << R"(
    ██████╗ ███████╗ ██████╗ ██████╗ ██╗    ██╗███████╗██████╗ ██╗   ██╗
    ██╔══██╗██╔════╝██╔════╝██╔═══██╗██║    ██║██╔════╝██╔══██╗╚██╗ ██╔╝
@@ -56,7 +112,6 @@ void System::renderUI(const string& bannerType, const string& subTitle, const ve
    ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝  ╚═══╝   ╚══════╝╚═╝  ╚═╝   ╚═╝ )" << endl;
     }
     else if (bannerType == "GOODBYE") {
-        SetConsoleTextAttribute(h, 4); // 
         cout << R"(
    ██████╗  ██████╗  ██████╗ ██████╗ ██████╗ ██╗   ██╗███████╗
    ██╔════╝ ██╔═══██╗██╔═══██╗██╔══██╗██╔══██╗╚██╗ ██╔╝██╔════╝
@@ -66,27 +121,27 @@ void System::renderUI(const string& bannerType, const string& subTitle, const ve
     ╚═════╝  ╚═════╝  ╚═════╝ ╚═════╝ ╚═════╝    ╚═╝   ╚══════╝ )" << endl;
     }
 
-    SetConsoleTextAttribute(h, 7); 
+    cout << Ansi::WHITE;
     string line = "+-----+----------------------------------------------------+";
     cout << "\n " << line << "\n";
     printf(" | INF | %-50s |\n", subTitle.c_str());
     cout << " " << line << "\n";
-    
-    SetConsoleTextAttribute(h, 11); 
+
+    cout << Ansi::CYAN;
     printf(" | ID  | %-50s |\n", "System Action");
-    SetConsoleTextAttribute(h, 7); 
+    cout << Ansi::WHITE;
     cout << " " << line << "\n";
 
     for (const auto& opt : options) {
         printf(" | %-3s | %-50s |\n", opt.first.c_str(), opt.second.c_str());
         cout << " " << line << "\n";
     }
-    cout << endl;
+    cout << Ansi::RESET << endl;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-void System::clearScreen() { system("cls"); }
+void System::clearScreen() { ::clearScreen(); }
 
 void System::pauseScreen() {
     cout << "\n   Press Enter to continue...";
@@ -126,7 +181,7 @@ void System::handleDashboard() {
     if(!u) return;
     bool admin = u->isAdmin();
     string owner = u->getUsername();
-    clearScreen();
+    ::clearScreen();
 
     int completed = tasks.completedTasks(owner, admin);
     int pending = tasks.pendingTasks(owner, admin);
@@ -134,7 +189,7 @@ void System::handleDashboard() {
 
     Table t;
     t.add_row({"Metric", "Count"});
-    t[0].format().font_style({FontStyle::bold}).font_color(Color::cyan);
+    t[0].format().font_style({FontStyle::bold}).font_color(tabulate::Color::cyan);
 
     if (admin) {
         t.add_row({"System-Wide Tasks", to_string(tasks.totalTasks())});
@@ -182,26 +237,26 @@ void System::handleTaskMenu() {
 
         ch = readInt(" >> Choice: ");
 
-        if (ch == 1) { clearScreen(); tasks.showAll(owner, admin); pauseScreen(); }
-        else if (ch == 2) { clearScreen(); tasks.addTask(owner); pauseScreen(); }
-        else if (ch == 3) { 
-            clearScreen(); tasks.showAll(owner, admin); 
-            tasks.editTask(readInt(" Enter Task ID: "), owner, admin); pauseScreen(); 
+        if (ch == 1) { ::clearScreen(); tasks.showAll(owner, admin); pauseScreen(); }
+        else if (ch == 2) { ::clearScreen(); tasks.addTask(owner); pauseScreen(); }
+        else if (ch == 3) {
+            ::clearScreen(); tasks.showAll(owner, admin);
+            tasks.editTask(readInt(" Enter Task ID: "), owner, admin); pauseScreen();
         }
-        else if (ch == 4) { 
-            clearScreen(); tasks.showAll(owner, admin); 
-            tasks.deleteTask(readInt(" Enter Task ID: "), owner, admin); pauseScreen(); 
+        else if (ch == 4) {
+            ::clearScreen(); tasks.showAll(owner, admin);
+            tasks.deleteTask(readInt(" Enter Task ID: "), owner, admin); pauseScreen();
         }
-        else if (ch == 5) { 
-            clearScreen(); tasks.showAll(owner, admin); 
-            tasks.advanceStatus(readInt(" Enter Task ID: "), owner, admin); pauseScreen(); 
+        else if (ch == 5) {
+            ::clearScreen(); tasks.showAll(owner, admin);
+            tasks.advanceStatus(readInt(" Enter Task ID: "), owner, admin); pauseScreen();
         }
         else if (ch == 6) {
-            clearScreen(); string kw; cout << " Search Title: "; cin.ignore(); getline(cin, kw);
+            ::clearScreen(); string kw; cout << " Search Title: "; cin.ignore(); getline(cin, kw);
             tasks.searchTasks(kw, owner, admin); pauseScreen();
         }
         else if (ch == 7) {
-            clearScreen();
+            ::clearScreen();
             cout << "\n   === SORTING & FILTERING ===\n";
             cout << "   1. Sort by Deadline (ASC)\n";
             cout << "   2. Sort by Priority (High-Low)\n";
@@ -238,18 +293,18 @@ void System::handleRecoveryMenu() {
 
         ch = readInt(" >> Choice: ");
 
-        if (ch == 1) { 
-            clearScreen(); tasks.showTrash(owner, admin); pauseScreen(); 
+        if (ch == 1) {
+            ::clearScreen(); tasks.showTrash(owner, admin); pauseScreen();
         }
-        else if (ch == 2) { 
-            clearScreen(); tasks.showTrash(owner, admin); 
-            tasks.restoreTask(readInt(" ID to Restore: "), owner, admin); 
-            pauseScreen(); 
+        else if (ch == 2) {
+            ::clearScreen(); tasks.showTrash(owner, admin);
+            tasks.restoreTask(readInt(" ID to Restore: "), owner, admin);
+            pauseScreen();
         }
-        else if (ch == 3) { 
-            clearScreen(); tasks.showTrash(owner, admin); 
-            tasks.permanentDelete(readInt(" ID to Wipe: "), owner, admin); 
-            pauseScreen(); 
+        else if (ch == 3) {
+            ::clearScreen(); tasks.showTrash(owner, admin);
+            tasks.permanentDelete(readInt(" ID to Wipe: "), owner, admin);
+            pauseScreen();
         }
     } while (ch != 0);
 }
@@ -269,18 +324,18 @@ void System::handleAdminUserMenu() {
 
         ch = readInt(" >> Choice: ");
 
-        if (ch == 1) { clearScreen(); auth.viewAllUsers(); pauseScreen(); }
-        else if (ch == 2) { 
-            clearScreen(); string kw; cout << " Keyword: "; cin >> kw; 
-            auth.searchUser(kw); pauseScreen(); 
+        if (ch == 1) { ::clearScreen(); auth.viewAllUsers(); pauseScreen(); }
+        else if (ch == 2) {
+            ::clearScreen(); string kw; cout << " Keyword: "; cin >> kw;
+            auth.searchUser(kw); pauseScreen();
         }
-        else if (ch == 3) { 
-            clearScreen(); auth.viewAllUsers(); string u; cout << " Username to Delete: "; cin >> u; 
-            auth.deleteUser(u); pauseScreen(); 
+        else if (ch == 3) {
+            ::clearScreen(); auth.viewAllUsers(); string u; cout << " Username to Delete: "; cin >> u;
+            auth.deleteUser(u); pauseScreen();
         }
-        else if (ch == 4) { 
-            clearScreen(); string u; cout << " Username: "; cin >> u; 
-            auth.resetPassword(u); pauseScreen(); 
+        else if (ch == 4) {
+            ::clearScreen(); string u; cout << " Username: "; cin >> u;
+            auth.resetPassword(u); pauseScreen();
         }
     } while (ch != 0);
 }
@@ -299,22 +354,22 @@ void System::handleAdminDataMenu() {
 
         ch = readInt(" >> Choice: ");
 
-        if (ch == 1) { clearScreen(); FileManager::backup(); pauseScreen(); }
+        if (ch == 1) { ::clearScreen(); FileManager::backup(); pauseScreen(); }
         else if (ch == 2) {
-            clearScreen(); cout << " Proceed with System Restore? (y/n): "; char c; cin >> c;
+            ::clearScreen(); cout << " Proceed with System Restore? (y/n): "; char c; cin >> c;
             if (c == 'y' || c == 'Y') {
-                FileManager::restore(); 
-                tasks.loadFromFile(); 
-                tasks.loadTrash(); 
+                FileManager::restore();
+                tasks.loadFromFile();
+                tasks.loadTrash();
                 auth.loadFromFile();
                 cout << "   Restore Complete.\n";
             }
             pauseScreen();
         }
-        else if (ch == 3) { 
-            clearScreen(); cout << " Are you sure? This wipes ALL tasks. (y/n): "; char c; cin >> c;
-            if (c == 'y' || c == 'Y') tasks.clearAllTasks(); 
-            pauseScreen(); 
+        else if (ch == 3) {
+            ::clearScreen(); cout << " Are you sure? This wipes ALL tasks. (y/n): "; char c; cin >> c;
+            if (c == 'y' || c == 'Y') tasks.clearAllTasks();
+            pauseScreen();
         }
     } while (ch != 0);
 }
@@ -361,11 +416,11 @@ void System::showAdminMenu() {
     } while (ch != 0 && auth.isLoggedIn());
 }
 
-// ── Entry point ──────────────────────────────────────────────────────────────
+// ── g point ──────────────────────────────────────────────────────────────
 
 void System::run() {
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
+    enableAnsiSupport();   // Windows 10+: enable VT100; Linux/macOS: no-op
+    setTitle("Task Track - Secure Management System");
 
     FileManager::ensureDataDir();
     auth.loadFromFile();
@@ -378,7 +433,7 @@ void System::run() {
         ch = readInt(" >> Access Command: ");
 
         if (ch == 1) {
-            clearScreen();
+            ::clearScreen();
             if (auth.login()) {
                 pauseScreen();
                 if (auth.getUser()->isAdmin()) showAdminMenu();
@@ -387,22 +442,20 @@ void System::run() {
                 pauseScreen();
             }
         }
-        else if (ch == 2) { 
-            clearScreen(); 
-            auth.signup(); 
-            pauseScreen(); 
+        else if (ch == 2) {
+            ::clearScreen();
+            auth.signup();
+            pauseScreen();
         }
     } while (ch != 0);
 
-    // Save before exit and show the new Goodbye Banner
     renderUI("GOODBYE", "SYSTEM SHUTDOWN - ALL DATA SECURED", {});
-    
-    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
-    SetConsoleTextAttribute(h, 14); 
+
+    cout << Ansi::YELLOW;
     cout << "\n   ==============================================" << endl;
     cout << "    [EXIT] Data Saved. Secure Session Closed." << endl;
     cout << "   ==============================================\n\n";
-    
-    // Brief sleep to let the user see the banner before the window closes
-    Sleep(1500);
+    cout << Ansi::RESET;
+
+    SLEEP_MS(1500);
 }
