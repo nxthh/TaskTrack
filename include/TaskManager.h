@@ -36,7 +36,7 @@ public:
     void sortByDeadline(const string &owner, bool isAdmin);
     void sortByPriority(const string &owner, bool isAdmin);
 
-    // ── Dashboard Methods (Fixes System.cpp Errors) ───────────
+    // ── Dashboard Methods ────────────────────────────────────
     int totalTasks() const;
     int completedTasks(const string &owner, bool isAdmin) const;
     int pendingTasks(const string &owner, bool isAdmin) const;
@@ -49,6 +49,6 @@ public:
     void showTrash(const string &ownerUsername, bool isAdmin) const; 
     void restoreTask(int id, const string &ownerUsername, bool isAdmin);
     void permanentDelete(int id, const string &ownerUsername, bool isAdmin);
-    void emptyTrash(); // Recommended addition for full cleanup
+    void emptyTrash();
     void clearAllTasks();
 };

@@ -176,10 +176,18 @@ void TaskManager::advanceStatus(int id, const string &owner, bool isAdmin) {
 // ── Search, Sort, Filter ─────────────────────────────────────────────────────
 
 void TaskManager::searchTasks(const string &keyword, const string &owner, bool isAdmin) const {
+
+    auto toLower = [](string s) {
+        for (auto &c : s) c = (char)tolower((unsigned char)c);
+        return s;
+    };
+    string kwLower = toLower(keyword);
+
     auto list = filterOwner(tasks, owner, isAdmin);
     vector<Task> results;
     for (const auto& t : list) {
-        if (t.getTitle().find(keyword) != string::npos || t.getDescription().find(keyword) != string::npos) {
+        if (toLower(t.getTitle()).find(kwLower)       != string::npos ||
+            toLower(t.getDescription()).find(kwLower) != string::npos) {
             results.push_back(t);
         }
     }

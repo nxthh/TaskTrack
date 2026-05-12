@@ -19,19 +19,16 @@
 using namespace std;
 using namespace tabulate;
 
-// ── ANSI Color Codes (work on Linux/macOS terminals; Windows 10+ with VT mode) ──
-// Named "Ansi" to avoid collision with tabulate::Color
 namespace Ansi {
     const string RESET   = "\033[0m";
-    const string CYAN    = "\033[96m";  // replaces SetConsoleTextAttribute(h, 11)
-    const string GREEN   = "\033[92m";  // replaces 10
-    const string YELLOW  = "\033[93m";  // replaces 14
-    const string RED     = "\033[91m";  // replaces 12
-    const string DARKRED = "\033[31m";  // replaces 4
-    const string WHITE   = "\033[97m";  // replaces 7
+    const string CYAN    = "\033[96m";  
+    const string GREEN   = "\033[92m";  
+    const string YELLOW  = "\033[93m";  
+    const string RED     = "\033[91m";  
+    const string DARKRED = "\033[31m";  
+    const string WHITE   = "\033[97m";  
 }
 
-// Enable ANSI escape codes on Windows 10+ (no-op on Linux/macOS)
 static void enableAnsiSupport() {
 #ifdef _WIN32
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -48,7 +45,6 @@ static void setTitle(const string& title) {
 #ifdef _WIN32
     SetConsoleTitleA(title.c_str());
 #else
-    // Sets terminal emulator title via escape sequence
     cout << "\033]0;" << title << "\007";
 #endif
 }
@@ -256,21 +252,45 @@ void System::handleTaskMenu() {
             tasks.searchTasks(kw, owner, admin); pauseScreen();
         }
         else if (ch == 7) {
-            ::clearScreen();
-            cout << "\n   === SORTING & FILTERING ===\n";
-            cout << "   1. Sort by Deadline (ASC)\n";
-            cout << "   2. Sort by Priority (High-Low)\n";
-            cout << "   3. Filter by Status\n";
-            cout << "   0. Cancel\n";
-            int sub = readInt("   >> Select: ");
-            if(sub == 1) tasks.sortByDeadline(owner, admin);
-            else if(sub == 2) tasks.sortByPriority(owner, admin);
-            else if(sub == 3) {
-                string stat; cout << "   Filter (To-Do / In Progress / Done): "; cin.ignore(); getline(cin, stat);
-                tasks.filterByStatus(stat, owner, admin);
-            }
-            if (sub != 0) pauseScreen();
+    int sub;
+    do {
+        ::clearScreen();
+        cout << "\n   === SORTING & FILTERING ===\n";
+        cout << "   1. Sort by Deadline (ASC)\n";
+        cout << "   2. Sort by Priority (High-Low)\n";
+        cout << "   3. Filter by Status\n";
+        cout << "   0. Back\n";
+        sub = readInt("   >> Select: ");
+
+        if (sub == 1) {
+            tasks.sortByDeadline(owner, admin);
+            pauseScreen();
         }
+        else if (sub == 2) {
+            tasks.sortByPriority(owner, admin);
+            pauseScreen();
+        }
+        else if (sub == 3) {
+            ::clearScreen();
+            cout << "\n   === FILTER BY STATUS ===\n";
+            cout << "   1. To-Do\n";
+            cout << "   2. In-Progress\n";
+            cout << "   3. Done\n";
+            cout << "   0. Cancel\n";
+            int statusChoice = readInt("   >> Select: ");
+
+            string stat;
+            if      (statusChoice == 1) stat = "To-Do";
+            else if (statusChoice == 2) stat = "In-Progress";
+            else if (statusChoice == 3) stat = "Done";
+
+            if (!stat.empty()) {
+                tasks.filterByStatus(stat, owner, admin);
+                pauseScreen();
+            }
+        }
+    } while (sub != 0);
+}
     } while (ch != 0);
 }
 
